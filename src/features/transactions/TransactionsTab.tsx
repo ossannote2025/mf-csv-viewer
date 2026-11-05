@@ -7,7 +7,9 @@ import { totals } from '../../lib/aggregate';
 import { formatDay } from '../../lib/date';
 import { activeFilterCount, applyFilter } from '../../lib/filter';
 import { formatCount, formatYen } from '../../lib/format';
-import type { Transaction } from '../../lib/types';
+import type { ExclusionRule, Transaction } from '../../lib/types';
+import { draftRule } from '../../lib/ruleText';
+import { RuleEditor } from '../settings/RuleEditor';
 import { useAppStore } from '../../store/useAppStore';
 import { FilterSheet } from './FilterSheet';
 import { TransactionDetail } from './TransactionDetail';
@@ -22,6 +24,7 @@ export function TransactionsTab() {
   const setFilter = useAppStore((s) => s.setFilter);
   const [filterOpen, setFilterOpen] = useState(false);
   const [selected, setSelected] = useState<Transaction | null>(null);
+  const [newRule, setNewRule] = useState<ExclusionRule | null>(null);
 
   const filtered = useMemo(() => applyFilter(transactions, filter, excluded), [transactions, filter, excluded]);
   const sum = useMemo(() => totals(filtered, excluded), [filtered, excluded]);
@@ -158,7 +161,15 @@ export function TransactionsTab() {
       )}
 
       <FilterSheet open={filterOpen} onClose={() => setFilterOpen(false)} />
-      <TransactionDetail t={selected} onClose={() => setSelected(null)} />
+      <TransactionDetail
+        t={selected}
+        onClose={() => setSelected(null)}
+        onCreateRule={(cond, name) => {
+          setSelected(null);
+          setNewRule(draftRule(rules, cond, name));
+        }}
+      />
+      {newRule && <RuleEditor rule={newRule} isNew onClose={() => setNewRule(null)} />}
     </Page>
   );
 }

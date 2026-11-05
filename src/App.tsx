@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Page } from './components/Page';
 import { TabBar } from './components/TabBar';
+import { UpdateBanner } from './components/UpdateBanner';
 import { ChartsTab } from './features/charts/ChartsTab';
 import { Onboarding } from './features/onboarding/Onboarding';
 import { ImportDialogs } from './features/settings/ImportDialogs';
@@ -52,6 +53,7 @@ export default function App() {
       {content}
       {status === 'ready' && <TabBar />}
       <ImportDialogs />
+      <UpdateBanner />
     </>
   );
 }

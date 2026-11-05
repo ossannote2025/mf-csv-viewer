@@ -3,8 +3,9 @@ import { sortByDateDesc } from '../lib/aggregate';
 import { EMPTY_FILTER, type TransactionFilter } from '../lib/filter';
 import { importCsvBytes, summarize, type FileImportResult, type ImportSummary } from '../lib/importer';
 import { computeExclusions } from '../lib/rules';
-import type { ExclusionMap, ExclusionRule, Transaction } from '../lib/types';
+import type { ExclusionMap, ExclusionRule, ImportRecord, Transaction } from '../lib/types';
 import * as repo from '../db/repo';
+import { backupFileName, createBackup, parseBackup } from '../lib/backup';
 
 export type Tab = 'transactions' | 'charts' | 'summary' | 'settings';
 
@@ -22,6 +23,8 @@ interface AppState {
   rules: ExclusionRule[];
   excluded: ExclusionMap;
   meta: { lastImportAt?: number; lastBackupAt?: number };
+  /** 取り込み履歴（バックアップに含める） */
+  imports: ImportRecord[];
   persisted: boolean | null;
 
   tab: Tab;
@@ -45,6 +48,10 @@ interface AppState {
   saveRule: (rule: ExclusionRule) => Promise<void>;
   deleteRule: (id: string) => Promise<void>;
   deleteAll: () => Promise<void>;
+  /** バックアップを書き出す。iPhoneでは共有シート（「ファイル」に保存）を使う */
+  exportBackup: () => Promise<'shared' | 'downloaded' | 'cancelled'>;
+  /** バックアップから復元する（エラー時は BackupError などを投げる） */
+  restoreBackup: (file: File, mode: 'replace' | 'merge') => Promise<{ count: number }>;
 }
 
 function withExclusions(transactions: Transaction[], rules: ExclusionRule[]) {
@@ -61,6 +68,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   rules: [],
   excluded: new Map(),
   meta: {},
+  imports: [],
   persisted: null,
   tab: 'transactions',
   filter: EMPTY_FILTER,
@@ -70,7 +78,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   init: async () => {
     try {
       const data = await repo.loadAll();
-      set({ status: 'ready', meta: data.meta, ...withExclusions(sortByDateDesc(data.transactions), data.rules) });
+      set({ status: 'ready', meta: data.meta, imports: data.imports, ...withExclusions(sortByDateDesc(data.transactions), data.rules) });
       if (data.transactions.length > 0) set({ tab: 'transactions' });
       repo.requestPersistence().then((persisted) => set({ persisted }));
     } catch (e) {
@@ -91,6 +99,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (files.length === 0 || get().importProgress) return;
     const byId = new Map(get().transactions.map((t) => [t.id, t]));
     const results: FileImportResult[] = [];
+    const newImports: ImportRecord[] = [];
     // 名前順に取り込む（同じIDが複数ファイルにある場合の上書き順を安定させる）
     const sorted = [...files].sort((a, b) => a.name.localeCompare(b.name, 'ja'));
     for (let i = 0; i < sorted.length; i++) {
@@ -103,13 +112,15 @@ export const useAppStore = create<AppState>((set, get) => ({
         const draft = new Map(byId);
         const { result, transactions } = importCsvBytes(bytes, file.name, draft, importedAt);
         if (result.ok) {
-          await repo.saveImported(transactions, {
+          const record: ImportRecord = {
             fileName: file.name,
             importedAt,
             rowCount: result.rowCount,
             added: result.added,
             updated: result.updated,
-          });
+          };
+          await repo.saveImported(transactions, record);
+          newImports.push(record);
           for (const t of transactions) byId.set(t.id, t);
         }
         results.push(result);
@@ -134,6 +145,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       importProgress: null,
       importSummary: summary,
       meta: anyOk ? { ...s.meta, lastImportAt: Date.now() } : s.meta,
+      imports: [...s.imports, ...newImports],
       ...(anyOk ? withExclusions(sortByDateDesc([...byId.values()]), s.rules) : {}),
     }));
   },
@@ -161,6 +173,59 @@ export const useAppStore = create<AppState>((set, get) => ({
   deleteAll: async () => {
     await repo.deleteAllData();
     const data = await repo.loadAll();
-    set({ meta: {}, filter: EMPTY_FILTER, summaryYm: undefined, ...withExclusions([], data.rules) });
+    set({ meta: {}, imports: [], filter: EMPTY_FILTER, summaryYm: undefined, ...withExclusions([], data.rules) });
+  },
+
+  exportBackup: async () => {
+    // 共有シートはタップ直後に呼ぶ必要があるため、ここまで await を挟まない
+    const { transactions, rules, meta, imports } = get();
+    const now = Date.now();
+    const json = JSON.stringify(createBackup(transactions, rules, imports, meta, now));
+    const name = backupFileName(new Date(now));
+    const file = new File([json], name, { type: 'application/json' });
+
+    let result: 'shared' | 'downloaded' | 'cancelled' = 'downloaded';
+    // タッチ端末（iPhoneなど）は共有シートから「"ファイル"に保存」できる
+    const touch = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+    if (touch && navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: name });
+        result = 'shared';
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'AbortError') return 'cancelled';
+        result = 'downloaded';
+        downloadFile(file);
+      }
+    } else {
+      downloadFile(file);
+    }
+    await repo.setMeta('lastBackupAt', now);
+    set((s) => ({ meta: { ...s.meta, lastBackupAt: now } }));
+    return result;
+  },
+
+  restoreBackup: async (file, mode) => {
+    const data = parseBackup(await file.text());
+    await repo.restoreBackup(data, mode);
+    const loaded = await repo.loadAll();
+    set({
+      meta: loaded.meta,
+      imports: loaded.imports,
+      filter: EMPTY_FILTER,
+      summaryYm: undefined,
+      ...withExclusions(sortByDateDesc(loaded.transactions), loaded.rules),
+    });
+    return { count: data.transactions.length };
   },
 }));
+
+function downloadFile(file: File) {
+  const url = URL.createObjectURL(file);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = file.name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
