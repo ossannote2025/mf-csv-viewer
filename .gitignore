@@ -1,0 +1,23 @@
+# 依存・ビルド成果物
+node_modules/
+dist/
+dev-dist/
+coverage/
+*.log
+.DS_Store
+.vite/
+*.tsbuildinfo
+
+# ===== 家計データの誤コミット防止 =====
+# CSVはすべて除外し、架空データ（sample/）だけを例外にする
+*.csv
+*.CSV
+!sample/**/*.csv
+
+# JSON（バックアップ）もすべて除外し、設定ファイルと sample/ だけを例外にする
+*.json
+!package.json
+!package-lock.json
+!tsconfig*.json
+!sample/**/*.json
+!.vscode/*.json
