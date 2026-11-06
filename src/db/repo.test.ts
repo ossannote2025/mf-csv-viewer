@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from './schema';
-import { deleteAllData, deleteMonth, loadAll, restoreBackup, saveImported } from './repo';
+import { deleteAllData, deleteMonth, loadAll, restoreBackup, saveImportBatch, saveImported } from './repo';
 import type { Transaction } from '../lib/types';
 
 function tx(id: string, date: string): Transaction {
@@ -68,5 +68,30 @@ describe('復元', () => {
     const d = await loadAll();
     expect(d.transactions.map((t) => t.id).sort()).toEqual(['a', 'b', 'old']);
     expect(d.transactions.find((t) => t.id === 'a')!.date).toBe('2025-08-01');
+  });
+});
+
+describe('saveImportBatch', () => {
+  beforeEach(async () => {
+    await deleteAllData();
+  });
+
+  it('分割して保存し、進捗を通知し、取り込み履歴と最終取り込み日を記録する', async () => {
+    const ts = Array.from({ length: 12 }, (_, i) => tx(`id${i}`, '2025-08-01'));
+    const progress: number[] = [];
+    await saveImportBatch(
+      ts,
+      [
+        { fileName: 'a', importedAt: 10, rowCount: 6, added: 6, updated: 0 },
+        { fileName: 'b', importedAt: 20, rowCount: 6, added: 6, updated: 0 },
+      ],
+      (done) => progress.push(done),
+      5,
+    );
+    const d = await loadAll();
+    expect(d.transactions).toHaveLength(12);
+    expect(progress).toEqual([5, 10, 12]);
+    expect(d.imports.map((r) => r.fileName)).toEqual(['a', 'b']);
+    expect(d.meta.lastImportAt).toBe(20);
   });
 });
