@@ -4,6 +4,7 @@ import { Sheet } from '../../components/Sheet';
 import { formatDateFull } from '../../lib/date';
 import type { RuleConditions, Transaction } from '../../lib/types';
 import { useAppStore } from '../../store/useAppStore';
+import { CreateRuleButtons } from './CreateRuleButtons';
 
 interface Props {
   t: Transaction | null;
@@ -51,27 +52,7 @@ export function TransactionDetail({ t, onClose, onCreateRule }: Props) {
       </dl>
       <div className="mt-4 border-t border-line pt-3">
         <p className="mb-2 text-sm font-bold">この明細から除外ルールを作る</p>
-        <div className="flex flex-col gap-2">
-          {t.content && (
-            <button
-              type="button"
-              onClick={() => onCreateRule({ content: { op: 'equals', value: t.content } }, t.content)}
-              className="min-h-11 rounded-lg bg-bg px-3 py-2 text-left text-sm"
-            >
-              内容が「<b className="break-all">{t.content}</b>」の明細を除外
-            </button>
-          )}
-          {t.institution && (
-            <button
-              type="button"
-              onClick={() => onCreateRule({ institutions: [t.institution], flow: t.amount < 0 ? 'expense' : 'income' }, `${t.institution}の${t.amount < 0 ? '支出' : '収入'}`)}
-              className="min-h-11 rounded-lg bg-bg px-3 py-2 text-left text-sm"
-            >
-              金融機関「<b>{t.institution}</b>」の{t.amount < 0 ? '支出' : '収入'}を除外
-            </button>
-          )}
-        </div>
-        <p className="mt-1 text-xs text-muted">次の画面で条件を調整し、除外される件数を確認してから保存できます。</p>
+        <CreateRuleButtons t={t} onCreateRule={onCreateRule} />
       </div>
     </Sheet>
   );
