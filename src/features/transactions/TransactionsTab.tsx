@@ -4,10 +4,13 @@ import { Amount } from '../../components/Amount';
 import { EyeIcon, EyeOffIcon, FilterIcon, SearchIcon, CloseIcon } from '../../components/Icons';
 import { Page } from '../../components/Page';
 import { totals } from '../../lib/aggregate';
-import { formatDay } from '../../lib/date';
 import { activeFilterCount, applyFilter } from '../../lib/filter';
 import { formatCount, formatYen } from '../../lib/format';
-import type { ExclusionRule, Transaction } from '../../lib/types';
+import type { ExclusionRule, RuleConditions, Transaction } from '../../lib/types';
+import { Sheet } from '../../components/Sheet';
+import { formatDateFull, formatDay } from '../../lib/date';
+import { useLongPress } from '../../hooks/useLongPress';
+import { CreateRuleButtons } from './CreateRuleButtons';
 import { draftRule } from '../../lib/ruleText';
 import { RuleEditor } from '../settings/RuleEditor';
 import { useAppStore } from '../../store/useAppStore';
@@ -25,6 +28,12 @@ export function TransactionsTab() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [selected, setSelected] = useState<Transaction | null>(null);
   const [newRule, setNewRule] = useState<ExclusionRule | null>(null);
+  const [pressed, setPressed] = useState<Transaction | null>(null);
+  const createRule = (cond: RuleConditions, name: string) => {
+    setSelected(null);
+    setPressed(null);
+    setNewRule(draftRule(rules, cond, name));
+  };
 
   const filtered = useMemo(() => applyFilter(transactions, filter, excluded), [transactions, filter, excluded]);
   const sum = useMemo(() => totals(filtered, excluded), [filtered, excluded]);
@@ -152,7 +161,13 @@ export function TransactionsTab() {
                     <Amount value={it.sum} className="font-normal" />
                   </div>
                 ) : (
-                  <TransactionRow t={it.t} hits={excluded.get(it.t.id)} ruleNames={ruleNames} onClick={() => setSelected(it.t)} />
+                  <TransactionRow
+                    t={it.t}
+                    hits={excluded.get(it.t.id)}
+                    ruleNames={ruleNames}
+                    onClick={() => setSelected(it.t)}
+                    onLongPress={() => setPressed(it.t)}
+                  />
                 )}
               </div>
             );
@@ -164,11 +179,26 @@ export function TransactionsTab() {
       <TransactionDetail
         t={selected}
         onClose={() => setSelected(null)}
-        onCreateRule={(cond, name) => {
-          setSelected(null);
-          setNewRule(draftRule(rules, cond, name));
-        }}
+        onCreateRule={createRule}
       />
+      {pressed && (
+        <Sheet open title="除外ルールを作る" onClose={() => setPressed(null)}>
+          <p className="mb-3 text-sm text-muted">
+            {formatDateFull(pressed.date)}・<Amount value={pressed.amount} />
+          </p>
+          <CreateRuleButtons t={pressed} onCreateRule={createRule} />
+          <button
+            type="button"
+            onClick={() => {
+              setSelected(pressed);
+              setPressed(null);
+            }}
+            className="mt-3 h-11 w-full rounded-lg border border-line text-sm"
+          >
+            明細の詳細を見る
+          </button>
+        </Sheet>
+      )}
       {newRule && <RuleEditor rule={newRule} isNew onClose={() => setNewRule(null)} />}
     </Page>
   );
@@ -179,18 +209,21 @@ function TransactionRow({
   hits,
   ruleNames,
   onClick,
+  onLongPress,
 }: {
   t: Transaction;
   hits?: string[];
   ruleNames: Map<string, string>;
   onClick: () => void;
+  onLongPress: () => void;
 }) {
   const isExcluded = !!hits;
+  const press = useLongPress(onLongPress, onClick);
   return (
     <button
       type="button"
-      onClick={onClick}
-      className={`flex min-h-16 w-full items-center gap-3 border-b border-line px-4 py-2 text-left active:bg-bg ${isExcluded ? 'bg-zinc-100 text-muted' : 'bg-surface'}`}
+      {...press}
+      className={`touch-manipulation select-none [-webkit-touch-callout:none] flex min-h-16 w-full items-center gap-3 border-b border-line px-4 py-2 text-left active:bg-bg ${isExcluded ? 'bg-zinc-100 text-muted' : 'bg-surface'}`}
     >
       <div className="min-w-0 flex-1">
         <p className={`truncate ${isExcluded ? 'line-through decoration-zinc-400' : 'font-medium'}`}>{t.content || '（内容なし）'}</p>

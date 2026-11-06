@@ -183,7 +183,7 @@ function RuleSection() {
       >
         ＋ ルールを追加
       </button>
-      <p className="mt-2 text-xs text-muted">明細をタップして「この明細から除外ルールを作る」からも作成できます。</p>
+      <p className="mt-2 text-xs text-muted">明細を長押し（PCでは右クリック）するか、タップして「この明細から除外ルールを作る」からも作成できます。</p>
       {editing && <RuleEditor rule={editing.rule} isNew={editing.isNew} onClose={() => setEditing(null)} />}
     </Card>
   );

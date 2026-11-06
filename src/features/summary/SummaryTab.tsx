@@ -1,64 +1,52 @@
 import { useMemo } from 'react';
 import { Amount } from '../../components/Amount';
-import { ChevronLeft, ChevronRight } from '../../components/Icons';
+import { ChangeText } from '../../components/ChangeText';
+import { MonthPicker } from '../../components/MonthPicker';
 import { Card, Page } from '../../components/Page';
-import { expenseByCategory, groupByMonth, listMonths, totals } from '../../lib/aggregate';
-import { formatYm } from '../../lib/date';
+import { expenseByCategory, totals } from '../../lib/aggregate';
+import { shiftYm } from '../../lib/date';
 import { monthRange } from '../../lib/filter';
 import { formatYen } from '../../lib/format';
+import { change } from '../../lib/series';
+import { useMonthData } from '../../hooks/useMonthData';
 import { useAppStore } from '../../store/useAppStore';
 
 export function SummaryTab() {
-  const transactions = useAppStore((s) => s.transactions);
+  const { transactions, months, byMonth, ym } = useMonthData();
   const excluded = useAppStore((s) => s.excluded);
-  const summaryYm = useAppStore((s) => s.summaryYm);
   const setSummaryYm = useAppStore((s) => s.setSummaryYm);
   const showTransactions = useAppStore((s) => s.showTransactions);
+  const oldestYm = transactions[transactions.length - 1]?.ym ?? '';
 
-  const months = useMemo(() => listMonths(transactions), [transactions]);
-  const byMonth = useMemo(() => groupByMonth(transactions), [transactions]);
-  const ym = summaryYm && byMonth.has(summaryYm) ? summaryYm : months[0]?.ym;
-  const idx = months.findIndex((m) => m.ym === ym);
-  const list = useMemo(() => (ym ? byMonth.get(ym) ?? [] : []), [byMonth, ym]);
-  const sum = useMemo(() => totals(list, excluded), [list, excluded]);
-  const cats = useMemo(() => expenseByCategory(list, excluded), [list, excluded]);
+  const calc = useMemo(() => {
+    if (!ym) return null;
+    const of = (m: string) => {
+      // データの期間より前の月は比較しない（0円と比べない）
+      if (m < oldestYm) return null;
+      const list = byMonth.get(m) ?? [];
+      const sum = totals(list, excluded);
+      const cats = new Map(expenseByCategory(list, excluded).map((c) => [c.name, c.amount]));
+      return { sum, cats };
+    };
+    return { cur: of(ym)!, prev: of(shiftYm(ym, -1)), lastYear: of(shiftYm(ym, -12)) };
+  }, [ym, byMonth, excluded, oldestYm]);
 
-  if (!ym) return null;
+  if (!ym || !calc) return null;
+  const { cur, prev, lastYear } = calc;
+  const sum = cur.sum;
+  const cats = [...cur.cats.entries()].map(([name, amount]) => ({ name, amount }));
   const maxCat = cats[0]?.amount ?? 0;
+
+  const compareRows: { label: string; key: 'income' | 'expense' | 'balance' }[] = [
+    { label: '収入', key: 'income' },
+    { label: '支出', key: 'expense' },
+    { label: '収支', key: 'balance' },
+  ];
 
   return (
     <Page title="集計">
-      <div className="mx-4 mt-4 flex items-center gap-2">
-        <button
-          type="button"
-          disabled={idx >= months.length - 1}
-          onClick={() => setSummaryYm(months[idx + 1].ym)}
-          className="flex size-11 items-center justify-center rounded-xl bg-surface shadow-sm disabled:opacity-30"
-          aria-label="前の月"
-        >
-          <ChevronLeft />
-        </button>
-        <select
-          value={ym}
-          onChange={(e) => setSummaryYm(e.target.value)}
-          className="h-11 flex-1 rounded-xl bg-surface px-3 text-center font-bold shadow-sm"
-          aria-label="月を選ぶ"
-        >
-          {months.map((m) => (
-            <option key={m.ym} value={m.ym}>
-              {formatYm(m.ym)}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          disabled={idx <= 0}
-          onClick={() => setSummaryYm(months[idx - 1].ym)}
-          className="flex size-11 items-center justify-center rounded-xl bg-surface shadow-sm disabled:opacity-30"
-          aria-label="次の月"
-        >
-          <ChevronRight />
-        </button>
+      <div className="mx-4 mt-4">
+        <MonthPicker months={months} value={ym} onChange={setSummaryYm} />
       </div>
 
       <Card>
@@ -81,13 +69,35 @@ export function SummaryTab() {
         <p className="mt-3 text-xs text-muted">
           集計 {sum.count}件{sum.excludedCount > 0 && ` ／ 除外 ${sum.excludedCount}件（振替・計算対象外・除外ルール）`}
         </p>
-        <button
-          type="button"
-          onClick={() => showTransactions(monthRange(ym))}
-          className="mt-3 h-11 w-full rounded-xl bg-bg text-sm font-medium text-accent"
-        >
+        <button type="button" onClick={() => showTransactions(monthRange(ym))} className="mt-3 h-11 w-full rounded-xl bg-bg text-sm font-medium text-accent">
           この月の明細を見る
         </button>
+      </Card>
+
+      <Card title="前月・前年同月との比較">
+        <table className="tabular w-full text-sm">
+          <thead>
+            <tr className="text-xs text-muted">
+              <th className="py-1 text-left font-normal" />
+              <th className="py-1 text-right font-normal">前月比</th>
+              <th className="py-1 text-right font-normal">前年同月比</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {compareRows.map((r) => (
+              <tr key={r.key}>
+                <th className="py-2 text-left font-normal">{r.label}</th>
+                <td className="py-2 text-right text-xs">
+                  <ChangeText c={change(sum[r.key], prev?.sum[r.key])} />
+                </td>
+                <td className="py-2 text-right text-xs">
+                  <ChangeText c={change(sum[r.key], lastYear?.sum[r.key])} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="mt-2 text-xs text-muted">▲は増加、▼は減少。比較する月のデータがない場合は「—」です。</p>
       </Card>
 
       <Card title="支出の内訳（大項目）">
@@ -114,6 +124,9 @@ export function SummaryTab() {
                   <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-bg">
                     <div className="h-full rounded-full bg-expense/70" style={{ width: `${maxCat ? (c.amount / maxCat) * 100 : 0}%` }} />
                   </div>
+                  <p className="mt-1 text-right text-[11px] text-muted">
+                    前月比 <ChangeText c={change(c.amount, prev ? prev.cats.get(c.name) ?? 0 : undefined)} showRatio={false} />
+                  </p>
                 </button>
               </li>
             ))}

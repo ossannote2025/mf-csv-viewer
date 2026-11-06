@@ -1,14 +1,16 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Page } from './components/Page';
 import { TabBar } from './components/TabBar';
 import { UpdateBanner } from './components/UpdateBanner';
-import { ChartsTab } from './features/charts/ChartsTab';
 import { Onboarding } from './features/onboarding/Onboarding';
 import { ImportDialogs } from './features/settings/ImportDialogs';
 import { SettingsTab } from './features/settings/SettingsTab';
 import { SummaryTab } from './features/summary/SummaryTab';
 import { TransactionsTab } from './features/transactions/TransactionsTab';
 import { useAppStore } from './store/useAppStore';
+
+// グラフ（Recharts）は大きいので、グラフタブを開いたときに読み込む
+const ChartsTab = lazy(() => import('./features/charts/ChartsTab'));
 
 const TITLES = { transactions: '明細', charts: 'グラフ', summary: '集計', settings: '設定' } as const;
 
@@ -45,7 +47,11 @@ export default function App() {
     );
   } else {
     content =
-      tab === 'transactions' ? <TransactionsTab /> : tab === 'charts' ? <ChartsTab /> : tab === 'summary' ? <SummaryTab /> : <SettingsTab />;
+      tab === 'transactions' ? <TransactionsTab /> : tab === 'charts' ? (
+        <Suspense fallback={<p className="py-24 text-center text-muted">読み込み中…</p>}>
+          <ChartsTab />
+        </Suspense>
+      ) : tab === 'summary' ? <SummaryTab /> : <SettingsTab />;
   }
 
   return (

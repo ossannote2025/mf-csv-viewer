@@ -5,9 +5,11 @@ import { importCsvBytes, summarize, type FileImportResult, type ImportSummary } 
 import { computeExclusions } from '../lib/rules';
 import type { ExclusionMap, ExclusionRule, ImportRecord, Transaction } from '../lib/types';
 import * as repo from '../db/repo';
+import type { RangePreset } from '../lib/series';
 import { backupFileName, createBackup, parseBackup } from '../lib/backup';
 
 export type Tab = 'transactions' | 'charts' | 'summary' | 'settings';
+export type ChartView = 'breakdown' | 'trend' | 'category' | 'institution';
 
 export interface ImportProgress {
   current: number;
@@ -29,8 +31,11 @@ interface AppState {
 
   tab: Tab;
   filter: TransactionFilter;
-  /** 集計タブで選択中の月 */
+  /** 集計タブ・グラフタブで選択中の月 */
   summaryYm?: string;
+  chartView: ChartView;
+  /** グラフの期間（既定は直近12か月） */
+  chartRange: RangePreset;
 
   importProgress: ImportProgress | null;
   importSummary: ImportSummary | null;
@@ -42,6 +47,8 @@ interface AppState {
   /** 条件を指定して明細タブを開く */
   showTransactions: (filter: Partial<TransactionFilter>) => void;
   setSummaryYm: (ym: string) => void;
+  setChartView: (v: ChartView) => void;
+  setChartRange: (r: RangePreset) => void;
   importFiles: (files: File[]) => Promise<void>;
   closeImportSummary: () => void;
   deleteMonth: (ym: string) => Promise<void>;
@@ -72,6 +79,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   persisted: null,
   tab: 'transactions',
   filter: EMPTY_FILTER,
+  chartView: 'breakdown',
+  chartRange: '12m',
   importProgress: null,
   importSummary: null,
 
@@ -94,6 +103,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   resetFilter: () => set((s) => ({ filter: { ...EMPTY_FILTER, showExcluded: s.filter.showExcluded } })),
   showTransactions: (patch) => set((s) => ({ tab: 'transactions', filter: { ...EMPTY_FILTER, showExcluded: s.filter.showExcluded, ...patch } })),
   setSummaryYm: (ym) => set({ summaryYm: ym }),
+  setChartView: (chartView) => set({ chartView }),
+  setChartRange: (chartRange) => set({ chartRange }),
 
   importFiles: async (files) => {
     if (files.length === 0 || get().importProgress) return;
