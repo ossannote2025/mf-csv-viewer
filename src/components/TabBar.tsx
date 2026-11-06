@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import { backupIsStale } from '../lib/backup';
 import { useAppStore, type Tab } from '../store/useAppStore';
 import { ChartIcon, GearIcon, ListIcon, SumIcon } from './Icons';
 
@@ -12,6 +13,8 @@ const TABS: { id: Tab; label: string; Icon: ComponentType<{ className?: string }
 export function TabBar() {
   const tab = useAppStore((s) => s.tab);
   const setTab = useAppStore((s) => s.setTab);
+  // バックアップが30日以上前（または未実施）なら設定タブに印を付ける
+  const needBackup = useAppStore((s) => backupIsStale(s.meta.lastBackupAt, s.transactions.length > 0));
   return (
     <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 backdrop-blur" aria-label="メインメニュー">
       <ul className="mx-auto flex max-w-3xl">
@@ -25,7 +28,12 @@ export function TabBar() {
                 aria-current={active ? 'page' : undefined}
                 className={`flex h-14 w-full flex-col items-center justify-center gap-0.5 text-[11px] ${active ? 'font-bold text-accent' : 'text-muted'}`}
               >
-                <Icon className="size-6" />
+                <span className="relative">
+                  <Icon className="size-6" />
+                  {id === 'settings' && needBackup && (
+                    <span className="absolute -top-0.5 -right-1 size-2.5 rounded-full bg-amber-500 ring-2 ring-surface" aria-label="バックアップをおすすめします" />
+                  )}
+                </span>
                 {label}
               </button>
             </li>

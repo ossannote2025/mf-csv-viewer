@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from './schema';
-import { deleteAllData, deleteMonth, loadAll, saveImported } from './repo';
+import { deleteAllData, deleteMonth, loadAll, restoreBackup, saveImported } from './repo';
 import type { Transaction } from '../lib/types';
 
 function tx(id: string, date: string): Transaction {
@@ -34,5 +34,39 @@ describe('repo（IndexedDB）', () => {
     expect(await deleteMonth('2025-08')).toBe(1);
     d = await loadAll();
     expect(d.transactions.map((t) => t.id)).toEqual(['b']);
+  });
+});
+
+describe('復元', () => {
+  beforeEach(async () => {
+    await deleteAllData();
+  });
+
+  const backup = (ids: string[]) => ({
+    app: 'mf-csv-viewer' as const,
+    format: 1,
+    exportedAt: 777,
+    transactions: ids.map((id) => tx(id, '2025-08-01')),
+    rules: [{ id: 'r1', name: 'ルール', enabled: true, order: 10, cond: { large: ['L'] }, createdAt: 0, updatedAt: 0 }],
+    imports: [{ fileName: 'f', importedAt: 1, rowCount: 1, added: 1, updated: 0 }],
+    meta: { lastImportAt: 5 },
+  });
+
+  it('置き換え：既存データは消えてバックアップの内容になる', async () => {
+    await saveImported([tx('old', '2024-01-01')], { fileName: 'f', importedAt: 1, rowCount: 1, added: 1, updated: 0 });
+    await restoreBackup(backup(['a', 'b']), 'replace');
+    const d = await loadAll();
+    expect(d.transactions.map((t) => t.id).sort()).toEqual(['a', 'b']);
+    expect(d.rules.map((r) => r.id)).toContain('r1');
+    expect(d.rules.filter((r) => r.builtin)).toHaveLength(2);
+    expect(d.meta.lastBackupAt).toBe(777);
+  });
+
+  it('マージ：既存データを残し、同じIDは上書き', async () => {
+    await saveImported([tx('old', '2024-01-01'), tx('a', '2024-01-01')], { fileName: 'f', importedAt: 1, rowCount: 2, added: 2, updated: 0 });
+    await restoreBackup(backup(['a', 'b']), 'merge');
+    const d = await loadAll();
+    expect(d.transactions.map((t) => t.id).sort()).toEqual(['a', 'b', 'old']);
+    expect(d.transactions.find((t) => t.id === 'a')!.date).toBe('2025-08-01');
   });
 });

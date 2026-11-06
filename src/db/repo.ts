@@ -1,24 +1,27 @@
 import type { ExclusionRule, ImportRecord, Transaction } from '../lib/types';
 import { ensureBuiltinRules } from '../lib/rules';
+import type { BackupData } from '../lib/backup';
 import { db, type MetaEntry } from './schema';
 
 export interface LoadedData {
   transactions: Transaction[];
   rules: ExclusionRule[];
   meta: Partial<Record<MetaEntry['key'], number>>;
+  imports: ImportRecord[];
 }
 
 export async function loadAll(): Promise<LoadedData> {
-  const [transactions, storedRules, metaRows] = await Promise.all([
+  const [transactions, storedRules, metaRows, imports] = await Promise.all([
     db.transactions.toArray(),
     db.rules.toArray(),
     db.meta.toArray(),
+    db.imports.orderBy('importedAt').toArray(),
   ]);
   const rules = ensureBuiltinRules(storedRules);
   if (rules.length !== storedRules.length) await db.rules.bulkPut(rules);
   const meta: LoadedData['meta'] = {};
   for (const m of metaRows) meta[m.key] = m.value;
-  return { transactions, rules, meta };
+  return { transactions, rules, meta, imports };
 }
 
 export async function saveImported(transactions: Transaction[], record: ImportRecord): Promise<void> {
@@ -46,6 +49,24 @@ export async function deleteRule(id: string): Promise<void> {
 
 export async function setMeta(key: MetaEntry['key'], value: number): Promise<void> {
   await db.meta.put({ key, value });
+}
+
+/**
+ * バックアップから復元する。
+ * - replace: 現在のデータをすべて消してバックアップの内容にする
+ * - merge: 現在のデータに追加し、同じIDの明細・ルールはバックアップの内容で上書きする
+ */
+export async function restoreBackup(data: BackupData, mode: 'replace' | 'merge'): Promise<void> {
+  await db.transaction('rw', [db.transactions, db.rules, db.imports, db.meta], async () => {
+    if (mode === 'replace') {
+      await Promise.all([db.transactions.clear(), db.rules.clear(), db.imports.clear()]);
+    }
+    await db.transactions.bulkPut(data.transactions);
+    await db.rules.bulkPut(data.rules);
+    if (data.imports.length) await db.imports.bulkAdd(data.imports.map((r) => ({ ...r })));
+    if (data.meta.lastImportAt) await db.meta.put({ key: 'lastImportAt', value: data.meta.lastImportAt });
+    if (data.exportedAt) await db.meta.put({ key: 'lastBackupAt', value: data.exportedAt });
+  });
 }
 
 /** 全データ削除（明細・ルール・履歴・メタ情報） */

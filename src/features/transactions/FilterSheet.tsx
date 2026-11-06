@@ -142,7 +142,7 @@ export function FilterSheet({ open, onClose }: { open: boolean; onClose: () => v
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <fieldset className="mb-5">
+    <fieldset className="mb-5 min-w-0">
       <legend className="mb-2 text-sm font-bold">{label}</legend>
       {children}
     </fieldset>
