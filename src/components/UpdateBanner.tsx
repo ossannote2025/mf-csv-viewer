@@ -15,12 +15,12 @@ export function UpdateBanner() {
   if (!needRefresh) return null;
   return (
     <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-50 px-4 pb-2" role="status">
-      <div className="mx-auto flex max-w-lg items-center gap-2 rounded-xl bg-ink p-3 text-sm text-white shadow-lg">
+      <div className="mx-auto flex max-w-lg items-center gap-2 rounded-xl bg-ink p-3 text-sm text-surface shadow-lg">
         <p className="flex-1">新しいバージョンがあります</p>
-        <button type="button" onClick={() => setNeedRefresh(false)} className="h-11 px-2 text-zinc-300">
+        <button type="button" onClick={() => setNeedRefresh(false)} className="h-11 px-2 text-surface/70">
           あとで
         </button>
-        <button type="button" onClick={() => void updateServiceWorker(true)} className="h-11 rounded-lg bg-accent px-4 font-bold">
+        <button type="button" onClick={() => void updateServiceWorker(true)} className="h-11 rounded-lg bg-accent px-4 font-bold text-white">
           更新
         </button>
       </div>

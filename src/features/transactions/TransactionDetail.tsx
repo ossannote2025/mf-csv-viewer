@@ -33,7 +33,7 @@ export function TransactionDetail({ t, onClose, onCreateRule }: Props) {
     <Sheet open title="明細の詳細" onClose={onClose}>
       <p className="text-lg font-bold break-all">{t.content || '（内容なし）'}</p>
       {hits.length > 0 ? (
-        <div className="mt-3 rounded-lg bg-zinc-100 p-3 text-sm">
+        <div className="mt-3 rounded-lg bg-excluded p-3 text-sm">
           <p className="font-bold">集計から除外されています</p>
           <ul className="mt-1 list-disc pl-5 text-muted">
             {hits.map((id) => (

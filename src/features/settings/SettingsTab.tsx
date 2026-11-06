@@ -214,7 +214,7 @@ function BackupSection() {
   return (
     <Card title="バックアップと復元">
       {stale && (
-        <p className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+        <p className="mb-3 rounded-lg bg-warn-soft p-3 text-sm text-warn-ink">
           {meta.lastBackupAt ? '最後のバックアップから30日以上たっています。' : 'まだバックアップがありません。'}
           iPhoneでは長く使わないとデータが消えることがあるため、バックアップをおすすめします。
         </p>

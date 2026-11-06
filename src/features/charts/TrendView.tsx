@@ -41,7 +41,7 @@ export function TrendView() {
               <YAxis orientation="right" tickFormatter={axisYen} tick={{ fontSize: 11, fill: MUTED }} tickLine={false} axisLine={false} width={56} />
               <ReferenceLine y={0} stroke={MUTED} />
               <Tooltip
-                cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                cursor={{ fill: 'var(--color-hover)' }}
                 content={({ active, payload }) => {
                   const p = active && payload?.[0]?.payload;
                   if (!p) return null;

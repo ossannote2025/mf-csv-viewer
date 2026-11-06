@@ -3,8 +3,9 @@
  * 9番目以降は色を増やさず「その他」にまとめる。
  * 収入・支出はアプリ全体の色（緑・赤）に合わせる。
  */
-export const SERIES = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6'];
-export const OTHER = '#a1a1aa';
+// 実際の色は index.css で定義（ダークモードでは暗い背景用に調整した同じ色相に切り替わる）
+export const SERIES = [1, 2, 3, 4, 5, 6, 7].map((i) => `var(--color-chart-${i})`);
+export const OTHER = 'var(--color-chart-other)';
 export const INCOME = 'var(--color-income)';
 export const EXPENSE = 'var(--color-expense)';
 export const INK = 'var(--color-ink)';

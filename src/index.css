@@ -12,7 +12,61 @@
   --color-income: #15803d;
   --color-expense: #dc2626;
   --color-danger: #b91c1c;
+  --color-danger-soft: #fef2f2;
+  --color-warn-soft: #fffbeb;
+  --color-warn-ink: #92400e;
+  --color-excluded: #f4f4f5;
+  --color-badge: #e4e4e7;
+  --color-badge-ink: #52525b;
+  --color-toggle-off: #d4d4d8;
+  --color-hover: rgb(0 0 0 / 0.05);
+  --color-raised: #ffffff;
+  /* グラフのカテゴリ色（固定順） */
+  --color-chart-1: #2a78d6;
+  --color-chart-2: #eb6834;
+  --color-chart-3: #1baf7a;
+  --color-chart-4: #eda100;
+  --color-chart-5: #e87ba4;
+  --color-chart-6: #008300;
+  --color-chart-7: #6250d6;
+  --color-chart-other: #a1a1aa;
   --font-sans: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic UI', 'Meiryo', sans-serif;
+}
+
+/* ダークモード：iPhoneの設定（外観モード）に追従する */
+:root {
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #09090b;
+    --color-surface: #18181b;
+    --color-line: #2e2e33;
+    --color-ink: #f4f4f5;
+    --color-muted: #a1a1aa;
+    --color-accent: #0d9488;
+    --color-accent-soft: #134e4a;
+    --color-income: #22c55e;
+    --color-expense: #f87171;
+    --color-danger: #ef4444;
+    --color-danger-soft: #3b1414;
+    --color-warn-soft: #3a2a0a;
+    --color-warn-ink: #fcd34d;
+    --color-excluded: #111113;
+    --color-badge: #2e2e33;
+    --color-badge-ink: #d4d4d8;
+    --color-toggle-off: #3f3f46;
+    --color-hover: rgb(255 255 255 / 0.08);
+    --color-raised: #3f3f46;
+    --color-chart-1: #3987e5;
+    --color-chart-2: #d95926;
+    --color-chart-3: #199e70;
+    --color-chart-4: #c98500;
+    --color-chart-5: #d55181;
+    --color-chart-6: #008300;
+    --color-chart-7: #9085e9;
+    --color-chart-other: #71717a;
+  }
 }
 
 html,

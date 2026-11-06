@@ -98,7 +98,7 @@ export function CategoryView() {
               <XAxis dataKey="ym" tickFormatter={axisMonth} tick={{ fontSize: 11, fill: MUTED }} tickLine={false} axisLine={{ stroke: GRID }} interval="preserveStartEnd" minTickGap={8} />
               <YAxis orientation="right" tickFormatter={axisYen} tick={{ fontSize: 11, fill: MUTED }} tickLine={false} axisLine={false} width={56} />
               <Tooltip
-                cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                cursor={{ fill: 'var(--color-hover)' }}
                 content={({ active, payload }) => {
                   const p = active && payload?.[0]?.payload;
                   return p ? <ChartTooltip title={formatYm(p.ym)} rows={[{ label, value: p.amount, color }]} /> : null;

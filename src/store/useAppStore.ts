@@ -7,6 +7,7 @@ import type { ExclusionMap, ExclusionRule, ImportRecord, Transaction } from '../
 import * as repo from '../db/repo';
 import type { RangePreset } from '../lib/series';
 import { backupFileName, createBackup, parseBackup } from '../lib/backup';
+import { saveFile } from '../lib/saveFile';
 
 export type Tab = 'transactions' | 'charts' | 'summary' | 'settings';
 export type ChartView = 'breakdown' | 'trend' | 'category' | 'institution';
@@ -34,6 +35,9 @@ interface AppState {
   /** 集計タブ・グラフタブで選択中の月 */
   summaryYm?: string;
   chartView: ChartView;
+  summaryMode: 'month' | 'year';
+  /** 年間レポートで選択中の年 */
+  reportYear?: string;
   /** グラフの期間（既定は直近12か月） */
   chartRange: RangePreset;
 
@@ -48,6 +52,8 @@ interface AppState {
   showTransactions: (filter: Partial<TransactionFilter>) => void;
   setSummaryYm: (ym: string) => void;
   setChartView: (v: ChartView) => void;
+  setSummaryMode: (m: 'month' | 'year') => void;
+  setReportYear: (y: string) => void;
   setChartRange: (r: RangePreset) => void;
   importFiles: (files: File[]) => Promise<void>;
   closeImportSummary: () => void;
@@ -80,6 +86,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   tab: 'transactions',
   filter: EMPTY_FILTER,
   chartView: 'breakdown',
+  summaryMode: 'month',
   chartRange: '12m',
   importProgress: null,
   importSummary: null,
@@ -104,6 +111,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   showTransactions: (patch) => set((s) => ({ tab: 'transactions', filter: { ...EMPTY_FILTER, showExcluded: s.filter.showExcluded, ...patch } })),
   setSummaryYm: (ym) => set({ summaryYm: ym }),
   setChartView: (chartView) => set({ chartView }),
+  setSummaryMode: (summaryMode) => set({ summaryMode }),
+  setReportYear: (reportYear) => set({ reportYear }),
   setChartRange: (chartRange) => set({ chartRange }),
 
   importFiles: async (files) => {
@@ -195,21 +204,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const name = backupFileName(new Date(now));
     const file = new File([json], name, { type: 'application/json' });
 
-    let result: 'shared' | 'downloaded' | 'cancelled' = 'downloaded';
-    // タッチ端末（iPhoneなど）は共有シートから「"ファイル"に保存」できる
-    const touch = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
-    if (touch && navigator.canShare?.({ files: [file] })) {
-      try {
-        await navigator.share({ files: [file], title: name });
-        result = 'shared';
-      } catch (e) {
-        if (e instanceof DOMException && e.name === 'AbortError') return 'cancelled';
-        result = 'downloaded';
-        downloadFile(file);
-      }
-    } else {
-      downloadFile(file);
-    }
+    const result = await saveFile(file);
+    if (result === 'cancelled') return result;
     await repo.setMeta('lastBackupAt', now);
     set((s) => ({ meta: { ...s.meta, lastBackupAt: now } }));
     return result;
@@ -230,13 +226,3 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 }));
 
-function downloadFile(file: File) {
-  const url = URL.createObjectURL(file);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = file.name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
-}

@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
 import { Amount } from '../../components/Amount';
+import { Segmented } from '../../components/Chips';
+import { YearReport } from './YearReport';
 import { ChangeText } from '../../components/ChangeText';
 import { MonthPicker } from '../../components/MonthPicker';
 import { Card, Page } from '../../components/Page';
@@ -12,6 +14,26 @@ import { useMonthData } from '../../hooks/useMonthData';
 import { useAppStore } from '../../store/useAppStore';
 
 export function SummaryTab() {
+  const mode = useAppStore((s) => s.summaryMode);
+  const setMode = useAppStore((s) => s.setSummaryMode);
+  return (
+    <Page title="集計">
+      <div className="sticky top-[calc(3rem+env(safe-area-inset-top))] z-20 border-b border-line bg-surface/95 px-4 py-2 backdrop-blur">
+        <Segmented
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: 'month', label: '月次' },
+            { value: 'year', label: '年間レポート' },
+          ]}
+        />
+      </div>
+      {mode === 'month' ? <MonthlyReport /> : <YearReport />}
+    </Page>
+  );
+}
+
+function MonthlyReport() {
   const { transactions, months, byMonth, ym } = useMonthData();
   const excluded = useAppStore((s) => s.excluded);
   const setSummaryYm = useAppStore((s) => s.setSummaryYm);
@@ -44,7 +66,7 @@ export function SummaryTab() {
   ];
 
   return (
-    <Page title="集計">
+    <>
       <div className="mx-4 mt-4">
         <MonthPicker months={months} value={ym} onChange={setSummaryYm} />
       </div>
@@ -133,6 +155,6 @@ export function SummaryTab() {
           </ul>
         )}
       </Card>
-    </Page>
+    </>
   );
 }
