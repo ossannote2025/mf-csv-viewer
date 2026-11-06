@@ -23,3 +23,5 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      - name: 色の変数の定義チェック
+        run: npm run check:css
