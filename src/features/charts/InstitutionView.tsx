@@ -86,7 +86,7 @@ export function InstitutionView() {
                 <XAxis type="number" tickFormatter={axisYen} tick={{ fontSize: 11, fill: MUTED }} tickLine={false} axisLine={false} />
                 <YAxis type="category" dataKey="name" width={Math.min(120, width * 0.35)} tick={{ fontSize: 12, fill: MUTED }} tickLine={false} axisLine={false} />
                 <Tooltip
-                  cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                  cursor={{ fill: 'var(--color-hover)' }}
                   content={({ active, payload }) => {
                     const p = active && payload?.[0]?.payload;
                     return p ? <ChartTooltip title={p.name} rows={[{ label: '支出', value: p.expense, color: EXPENSE }]} /> : null;

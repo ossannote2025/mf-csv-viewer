@@ -43,7 +43,7 @@ export function Segmented<T extends string>({ value, options, onChange }: SegPro
           type="button"
           aria-pressed={o.value === value}
           onClick={() => onChange(o.value)}
-          className={`h-10 flex-1 rounded-lg text-sm ${o.value === value ? 'bg-surface font-bold shadow-sm' : 'text-muted'}`}
+          className={`h-10 flex-1 rounded-lg text-sm ${o.value === value ? 'bg-raised font-bold shadow-sm' : 'text-muted'}`}
         >
           {o.label}
         </button>

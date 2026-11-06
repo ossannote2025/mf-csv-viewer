@@ -1,7 +1,9 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { Amount } from '../../components/Amount';
-import { EyeIcon, EyeOffIcon, FilterIcon, SearchIcon, CloseIcon } from '../../components/Icons';
+import { DownloadIcon, EyeIcon, EyeOffIcon, FilterIcon, SearchIcon, CloseIcon } from '../../components/Icons';
+import { exportFileName, toCsv } from '../../lib/exportCsv';
+import { saveFile } from '../../lib/saveFile';
 import { Page } from '../../components/Page';
 import { totals } from '../../lib/aggregate';
 import { activeFilterCount, applyFilter } from '../../lib/filter';
@@ -80,6 +82,21 @@ export function TransactionsTab() {
     <Page
       title="明細"
       actions={
+        <>
+        <button
+          type="button"
+          disabled={filtered.length === 0}
+          onClick={() => {
+            // 共有シートはタップ直後に開く必要があるため、同期的にCSVを作る
+            const csv = toCsv(filtered, excluded, rules);
+            void saveFile(new File([csv], exportFileName('mf-csv-viewer-export'), { type: 'text/csv' }));
+          }}
+          className="flex h-11 items-center gap-1 px-2 text-sm text-muted disabled:opacity-40"
+          aria-label={`表示中の${filtered.length}件をCSVで書き出す`}
+        >
+          <DownloadIcon className="size-5" />
+          CSV
+        </button>
         <button
           type="button"
           onClick={() => setFilter({ showExcluded: !filter.showExcluded })}
@@ -89,6 +106,7 @@ export function TransactionsTab() {
           {filter.showExcluded ? <EyeIcon className="size-5" /> : <EyeOffIcon className="size-5" />}
           除外を{filter.showExcluded ? '表示中' : '非表示'}
         </button>
+        </>
       }
     >
       <div className="sticky top-[calc(3rem+env(safe-area-inset-top))] z-20 border-b border-line bg-surface/95 px-4 py-2 backdrop-blur">
@@ -123,7 +141,7 @@ export function TransactionsTab() {
           >
             <FilterIcon className="size-5" />
             絞り込み
-            {nFilters > 0 && <span className="ml-0.5 rounded-full bg-white px-1.5 text-xs text-accent">{nFilters}</span>}
+            {nFilters > 0 && <span className="ml-0.5 rounded-full bg-surface px-1.5 text-xs text-accent">{nFilters}</span>}
           </button>
         </div>
         <div className="tabular mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs text-muted">
@@ -223,10 +241,10 @@ function TransactionRow({
     <button
       type="button"
       {...press}
-      className={`touch-manipulation select-none [-webkit-touch-callout:none] flex min-h-16 w-full items-center gap-3 border-b border-line px-4 py-2 text-left active:bg-bg ${isExcluded ? 'bg-zinc-100 text-muted' : 'bg-surface'}`}
+      className={`touch-manipulation select-none [-webkit-touch-callout:none] flex min-h-16 w-full items-center gap-3 border-b border-line px-4 py-2 text-left active:bg-bg ${isExcluded ? 'bg-excluded text-muted' : 'bg-surface'}`}
     >
       <div className="min-w-0 flex-1">
-        <p className={`truncate ${isExcluded ? 'line-through decoration-zinc-400' : 'font-medium'}`}>{t.content || '（内容なし）'}</p>
+        <p className={`truncate ${isExcluded ? 'line-through decoration-muted' : 'font-medium'}`}>{t.content || '（内容なし）'}</p>
         <p className="mt-0.5 truncate text-xs text-muted">
           {t.large}／{t.middle}・{t.institution}
           {t.memo && <span>・📝{t.memo}</span>}
@@ -234,7 +252,7 @@ function TransactionRow({
         {hits && (
           <p className="mt-0.5 flex flex-wrap gap-1">
             {hits.map((id) => (
-              <span key={id} className="rounded bg-zinc-200 px-1.5 text-[11px] text-zinc-600">
+              <span key={id} className="rounded bg-badge px-1.5 text-[11px] text-badge-ink">
                 除外: {ruleNames.get(id) ?? '不明なルール'}
               </span>
             ))}

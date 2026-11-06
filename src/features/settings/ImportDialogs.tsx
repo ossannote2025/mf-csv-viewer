@@ -54,7 +54,7 @@ export function ImportDialogs() {
           <h3 className="text-sm font-bold text-danger">取り込めなかったファイル（{summary.failed.length}件）</h3>
           <ul className="mt-2 space-y-2">
             {summary.failed.map((f) => (
-              <li key={f.fileName} className="rounded-lg bg-red-50 p-3 text-sm">
+              <li key={f.fileName} className="rounded-lg bg-danger-soft p-3 text-sm">
                 <p className="font-medium break-all">{f.fileName}</p>
                 <p className="mt-1 text-danger">{f.error}</p>
               </li>
@@ -65,12 +65,12 @@ export function ImportDialogs() {
 
       {warned.length > 0 && (
         <section className="mt-4">
-          <h3 className="text-sm font-bold text-amber-700">一部の行を読み飛ばしたファイル</h3>
+          <h3 className="text-sm font-bold text-warn-ink">一部の行を読み飛ばしたファイル</h3>
           <ul className="mt-2 space-y-2">
             {warned.map((f) => (
-              <li key={f.fileName} className="rounded-lg bg-amber-50 p-3 text-sm">
+              <li key={f.fileName} className="rounded-lg bg-warn-soft p-3 text-sm">
                 <p className="font-medium break-all">{f.fileName}</p>
-                <ul className="mt-1 list-disc pl-5 text-amber-800">
+                <ul className="mt-1 list-disc pl-5 text-warn-ink">
                   {f.rowErrors.slice(0, 5).map((e) => (
                     <li key={e.line}>
                       {e.line}行目: {e.message}
