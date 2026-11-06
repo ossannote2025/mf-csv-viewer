@@ -13,9 +13,18 @@ export type Tab = 'transactions' | 'charts' | 'summary' | 'settings';
 export type ChartView = 'breakdown' | 'trend' | 'category' | 'institution';
 
 export interface ImportProgress {
+  /** read: ファイルの読み込み・解析中、save: 保存中 */
+  phase: 'read' | 'save';
   current: number;
   total: number;
   fileName: string;
+}
+
+/** 取り込みにかかった時間（ミリ秒）。どこが遅いかを画面で確認できるようにする */
+export interface ImportTiming {
+  read: number;
+  save: number;
+  finish: number;
 }
 
 interface AppState {
@@ -42,7 +51,7 @@ interface AppState {
   chartRange: RangePreset;
 
   importProgress: ImportProgress | null;
-  importSummary: ImportSummary | null;
+  importSummary: (ImportSummary & { timing: ImportTiming }) | null;
 
   init: () => Promise<void>;
   setTab: (tab: Tab) => void;
@@ -117,57 +126,69 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   importFiles: async (files) => {
     if (files.length === 0 || get().importProgress) return;
+    const t0 = performance.now();
     const byId = new Map(get().transactions.map((t) => [t.id, t]));
+    /** 今回の取り込みで追加・上書きされる明細（同じIDは後のファイルが優先） */
+    const changed = new Map<string, Transaction>();
     const results: FileImportResult[] = [];
     const newImports: ImportRecord[] = [];
     // 名前順に取り込む（同じIDが複数ファイルにある場合の上書き順を安定させる）
     const sorted = [...files].sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+
+    // 1. すべてのファイルを読み込んで解析する（まだ保存しない）
     for (let i = 0; i < sorted.length; i++) {
       const file = sorted[i];
-      set({ importProgress: { current: i + 1, total: sorted.length, fileName: file.name } });
+      set({ importProgress: { phase: 'read', current: i + 1, total: sorted.length, fileName: file.name } });
       const importedAt = Date.now();
       try {
         const bytes = await file.arrayBuffer();
-        // 失敗時に巻き戻せるよう、保存が終わるまでは仮のMapで計算する
-        const draft = new Map(byId);
-        const { result, transactions } = importCsvBytes(bytes, file.name, draft, importedAt);
+        const { result, transactions } = importCsvBytes(bytes, file.name, byId, importedAt);
         if (result.ok) {
-          const record: ImportRecord = {
-            fileName: file.name,
-            importedAt,
-            rowCount: result.rowCount,
-            added: result.added,
-            updated: result.updated,
-          };
-          await repo.saveImported(transactions, record);
-          newImports.push(record);
-          for (const t of transactions) byId.set(t.id, t);
+          for (const t of transactions) changed.set(t.id, t);
+          newImports.push({ fileName: file.name, importedAt, rowCount: result.rowCount, added: result.added, updated: result.updated });
         }
         results.push(result);
       } catch (e) {
-        results.push({
-          fileName: file.name,
-          ok: false,
-          error: `保存中にエラーが発生しました（${errorMessage(e)}）。`,
-          rowCount: 0,
-          added: 0,
-          updated: 0,
-          rowErrors: [],
-          months: [],
-        });
+        results.push(failedResult(file.name, `ファイルを読み込めませんでした（${errorMessage(e)}）。`));
       }
-      // 画面の更新（進捗表示）のために制御を戻す
-      await new Promise((r) => setTimeout(r, 0));
+      // 画面の更新（進捗表示）のために、ときどき制御を戻す
+      if (i % 5 === 4 || i === sorted.length - 1) await new Promise((r) => setTimeout(r, 0));
     }
-    const summary = summarize(results);
-    const anyOk = results.some((r) => r.ok);
-    set((s) => ({
+    const t1 = performance.now();
+
+    // 2. まとめて保存する
+    let saveFailed = false;
+    if (changed.size > 0) {
+      const total = changed.size;
+      set({ importProgress: { phase: 'save', current: 0, total, fileName: '' } });
+      try {
+        await repo.saveImportBatch([...changed.values()], newImports, (done) =>
+          set({ importProgress: { phase: 'save', current: done, total, fileName: '' } }),
+        );
+      } catch (e) {
+        saveFailed = true;
+        const msg = `保存中にエラーが発生しました（${errorMessage(e)}）。端末の空き容量を確認してください。`;
+        for (let i = 0; i < results.length; i++) if (results[i].ok) results[i] = failedResult(results[i].fileName, msg);
+      }
+    }
+    const t2 = performance.now();
+
+    // 3. 画面のデータを更新する（保存に失敗したときはDBの内容に合わせ直す）
+    if (saveFailed) {
+      const loaded = await repo.loadAll();
+      set({ meta: loaded.meta, imports: loaded.imports, ...withExclusions(sortByDateDesc(loaded.transactions), get().rules) });
+    } else if (changed.size > 0) {
+      set((s) => ({
+        meta: { ...s.meta, lastImportAt: Date.now() },
+        imports: [...s.imports, ...newImports],
+        ...withExclusions(sortByDateDesc([...byId.values()]), s.rules),
+      }));
+    }
+    const t3 = performance.now();
+    set({
       importProgress: null,
-      importSummary: summary,
-      meta: anyOk ? { ...s.meta, lastImportAt: Date.now() } : s.meta,
-      imports: [...s.imports, ...newImports],
-      ...(anyOk ? withExclusions(sortByDateDesc([...byId.values()]), s.rules) : {}),
-    }));
+      importSummary: { ...summarize(results), timing: { read: t1 - t0, save: t2 - t1, finish: t3 - t2 } },
+    });
   },
 
   closeImportSummary: () => set({ importSummary: null }),
@@ -226,3 +247,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 }));
 
+
+function failedResult(fileName: string, error: string): FileImportResult {
+  return { fileName, ok: false, error, rowCount: 0, added: 0, updated: 0, rowErrors: [], months: [] };
+}

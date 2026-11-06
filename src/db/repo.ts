@@ -35,6 +35,28 @@ export async function saveImported(transactions: Transaction[], record: ImportRe
   });
 }
 
+/**
+ * 取り込んだ明細をまとめて保存する。
+ * Safari の IndexedDB はトランザクションの確定ごとの負担が大きいため、ファイルごとではなく
+ * まとめて（chunkSize 件ずつ）保存する。
+ */
+export async function saveImportBatch(
+  transactions: Transaction[],
+  records: ImportRecord[],
+  onProgress?: (done: number, total: number) => void,
+  chunkSize = 5000,
+): Promise<void> {
+  for (let i = 0; i < transactions.length; i += chunkSize) {
+    await db.transactions.bulkPut(transactions.slice(i, i + chunkSize));
+    onProgress?.(Math.min(i + chunkSize, transactions.length), transactions.length);
+  }
+  if (records.length === 0) return;
+  await db.transaction('rw', db.imports, db.meta, async () => {
+    await db.imports.bulkAdd(records.map(({ seq: _seq, ...r }) => (void _seq, r)));
+    await db.meta.put({ key: 'lastImportAt', value: Math.max(...records.map((r) => r.importedAt)) });
+  });
+}
+
 export async function deleteMonth(ym: string): Promise<number> {
   return db.transactions.where('ym').equals(ym).delete();
 }

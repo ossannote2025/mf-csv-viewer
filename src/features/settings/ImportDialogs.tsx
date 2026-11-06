@@ -11,12 +11,26 @@ export function ImportDialogs() {
   const close = useAppStore((s) => s.closeImportSummary);
 
   if (progress) {
-    const pct = Math.round(((progress.current - 1) / progress.total) * 100);
+    const reading = progress.phase === 'read';
+    const pct = reading ? Math.round(((progress.current - 1) / progress.total) * 100) : Math.round((progress.current / progress.total) * 100);
     return (
       <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4" role="status" aria-live="polite">
         <div className="w-full max-w-sm rounded-2xl bg-surface p-5 shadow-xl">
-          <p className="font-bold">取り込み中… {progress.current} / {progress.total} ファイル目</p>
-          <p className="mt-1 truncate text-sm text-muted">{progress.fileName}</p>
+          {reading ? (
+            <>
+              <p className="font-bold">
+                読み込み中… {progress.current} / {progress.total} ファイル目
+              </p>
+              <p className="mt-1 truncate text-sm text-muted">{progress.fileName}</p>
+            </>
+          ) : (
+            <>
+              <p className="font-bold">保存中…</p>
+              <p className="tabular mt-1 text-sm text-muted">
+                {formatCount(progress.current)} / {formatCount(progress.total)}
+              </p>
+            </>
+          )}
           <div className="mt-4 h-2 overflow-hidden rounded-full bg-line">
             <div className="h-full bg-accent transition-all" style={{ width: `${pct}%` }} />
           </div>
@@ -84,8 +98,12 @@ export function ImportDialogs() {
         </section>
       )}
 
+      <p className="tabular mt-4 text-xs text-muted">
+        かかった時間：読み込み {sec(summary.timing.read)}・保存 {sec(summary.timing.save)}・表示の更新 {sec(summary.timing.finish)}
+      </p>
+
       {ok.length > 0 && (
-        <details className="mt-4 text-sm">
+        <details className="mt-2 text-sm">
           <summary className="flex min-h-11 cursor-pointer items-center text-muted">ファイルごとの内訳</summary>
           <ul className="divide-y divide-line">
             {ok.map((f) => (
@@ -102,6 +120,10 @@ export function ImportDialogs() {
       )}
     </Sheet>
   );
+}
+
+function sec(ms: number): string {
+  return `${(ms / 1000).toFixed(1)}秒`;
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
