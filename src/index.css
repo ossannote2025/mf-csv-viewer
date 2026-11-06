@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 
 /* 色はすべて変数で定義（フェーズ3のダークモードで上書きする） */
-@theme {
+@theme static {
   --color-bg: #f4f4f5;
   --color-surface: #ffffff;
   --color-line: #e4e4e7;
