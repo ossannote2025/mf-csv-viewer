@@ -7,7 +7,7 @@ import { expenseByCategory } from '../../lib/aggregate';
 import { formatYm } from '../../lib/date';
 import { monthRange } from '../../lib/filter';
 import { formatYen } from '../../lib/format';
-import { stableSlots } from '../../lib/series';
+import { assignSlots, stableSlots } from '../../lib/series';
 import { useMonthData } from '../../hooks/useMonthData';
 import { useAppStore } from '../../store/useAppStore';
 import { OTHER, SERIES } from './chartTheme';
@@ -25,14 +25,17 @@ export function BreakdownView() {
     () => (large ? expenseByCategory(list.filter((t) => t.large === large), excluded, 'middle') : expenseByCategory(list, excluded, 'large')),
     [list, excluded, large],
   );
-  // 色は全期間の金額順で固定（月を変えても同じ項目は同じ色）
-  const slots = useMemo(() => {
+  // 色は全期間の金額順で項目ごとに決めておき（月を変えても同じ項目はなるべく同じ色）、
+  // そのうえで表示中の月の上位7項目には必ず色を付ける。8位以下は「その他」（灰色）
+  const preferred = useMemo(() => {
     const all = large ? transactions.filter((t) => t.large === large) : transactions;
     return stableSlots(expenseByCategory(all, excluded, large ? 'middle' : 'large'), SERIES.length);
   }, [transactions, excluded, large]);
+  const slots = useMemo(() => assignSlots(cats.map((c) => c.name), preferred, SERIES.length), [cats, preferred]);
 
   if (!ym) return null;
   const total = cats.reduce((s, c) => s + c.amount, 0);
+  const maxAmount = cats[0]?.amount || 1;
   const colorOf = (name: string) => {
     const i = slots.get(name);
     return i === undefined ? OTHER : SERIES[i];
@@ -104,17 +107,30 @@ export function BreakdownView() {
             <ul className="-mx-2 mt-3">
               {cats.map((c) => (
                 <li key={c.name}>
-                  <button type="button" onClick={() => select(c.name)} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-2 text-left active:bg-bg">
+                  <button type="button" onClick={() => select(c.name)} className="flex min-h-12 w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left active:bg-bg">
                     <span className="size-3 shrink-0 rounded-sm" style={{ background: colorOf(c.name) }} aria-hidden="true" />
-                    <span className="min-w-0 flex-1 truncate text-sm">{c.name}</span>
-                    <span className="tabular text-sm">{formatYen(c.amount)}</span>
-                    <span className="tabular w-12 text-right text-xs text-muted">{Math.round((c.amount / total) * 1000) / 10}%</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline gap-3">
+                        <span className="min-w-0 flex-1 truncate text-sm">{c.name}</span>
+                        <span className="tabular text-sm">{formatYen(c.amount)}</span>
+                        <span className="tabular w-12 text-right text-xs text-muted">{Math.round((c.amount / total) * 1000) / 10}%</span>
+                      </span>
+                      {/* 割合の横棒：色が「その他」の灰色でも大きさがわかるように */}
+                      <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-bg" aria-hidden="true">
+                        <span className="block h-full rounded-full" style={{ width: `${(c.amount / maxAmount) * 100}%`, background: colorOf(c.name) }} />
+                      </span>
+                    </span>
                     <ChevronRight className="size-4 shrink-0 text-muted" />
                   </button>
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-xs text-muted">
+            {cats.length > SERIES.length && (
+              <p className="mt-2 text-xs text-muted">
+                グラフでは、{SERIES.length + 1}位以下の{cats.length - SERIES.length}項目を「その他」（灰色）にまとめています。
+              </p>
+            )}
+            <p className="mt-1 text-xs text-muted">
               {large ? '中項目をタップすると、その明細の一覧を表示します。' : '大項目をタップすると、中項目の内訳を表示します。'}
             </p>
           </>
