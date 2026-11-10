@@ -46,7 +46,7 @@ export function ImportPanel({ compact }: { compact?: boolean }) {
         type="button"
         disabled={!!progress}
         onClick={() => inputRef.current?.click()}
-        className="inline-flex h-12 items-center gap-2 rounded-xl bg-accent px-5 font-bold text-white disabled:opacity-50"
+        className="inline-flex h-12 items-center gap-2 rounded-xl bg-accent px-5 font-bold text-on-accent disabled:opacity-50"
       >
         <UploadIcon className="size-5" />
         CSVファイルを選ぶ

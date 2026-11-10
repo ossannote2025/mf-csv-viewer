@@ -20,7 +20,7 @@ export function UpdateBanner() {
         <button type="button" onClick={() => setNeedRefresh(false)} className="h-11 px-2 text-surface/70">
           あとで
         </button>
-        <button type="button" onClick={() => void updateServiceWorker(true)} className="h-11 rounded-lg bg-accent px-4 font-bold text-white">
+        <button type="button" onClick={() => void updateServiceWorker(true)} className="h-11 rounded-lg bg-accent px-4 font-bold text-on-accent">
           更新
         </button>
       </div>

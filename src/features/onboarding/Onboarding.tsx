@@ -38,7 +38,7 @@ export function Onboarding() {
 function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
   return (
     <li className="flex gap-3">
-      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-white">{n}</span>
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-on-accent">{n}</span>
       <div>
         <p className="font-bold">{title}</p>
         <p className="mt-0.5 text-muted">{children}</p>

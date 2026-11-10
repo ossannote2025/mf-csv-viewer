@@ -49,7 +49,7 @@ export function ImportDialogs() {
       title="取り込み結果"
       onClose={close}
       footer={
-        <button type="button" onClick={close} className="h-12 w-full rounded-xl bg-accent font-bold text-white">
+        <button type="button" onClick={close} className="h-12 w-full rounded-xl bg-accent font-bold text-on-accent">
           OK
         </button>
       }

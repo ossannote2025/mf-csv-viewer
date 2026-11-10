@@ -17,17 +17,20 @@ export function SummaryTab() {
   const mode = useAppStore((s) => s.summaryMode);
   const setMode = useAppStore((s) => s.setSummaryMode);
   return (
-    <Page title="集計">
-      <div className="sticky top-[calc(3rem+env(safe-area-inset-top))] z-20 border-b border-line bg-surface/95 px-4 py-2 backdrop-blur">
+    <Page
+      title="集計"
+      sub={
         <Segmented
           value={mode}
           onChange={setMode}
+          tone="onHeader"
           options={[
             { value: 'month', label: '月次' },
             { value: 'year', label: '年間レポート' },
           ]}
         />
-      </div>
+      }
+    >
       {mode === 'month' ? <MonthlyReport /> : <YearReport />}
     </Page>
   );

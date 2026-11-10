@@ -49,7 +49,7 @@ export function FilterSheet({ open, onClose }: { open: boolean; onClose: () => v
           <button type="button" onClick={resetFilter} className="h-12 flex-1 rounded-xl border border-line font-medium">
             条件をクリア
           </button>
-          <button type="button" onClick={onClose} className="h-12 flex-[2] rounded-xl bg-accent font-bold text-white">
+          <button type="button" onClick={onClose} className="h-12 flex-[2] rounded-xl bg-accent font-bold text-on-accent">
             {formatCount(count)}を表示
           </button>
         </div>

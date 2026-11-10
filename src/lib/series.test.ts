@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assignSlots, byInstitution, categoryMonthMatrix, change, monthlySeries, presetRange, stableSlots, ymRange } from './series';
+import { byInstitution, categoryMonthMatrix, change, monthlySeries, presetRange, ymRange } from './series';
 import type { ExclusionMap, Transaction } from './types';
 
 let n = 0;
@@ -63,7 +63,7 @@ describe('categoryMonthMatrix', () => {
   });
 });
 
-describe('change / byInstitution / stableSlots', () => {
+describe('change / byInstitution', () => {
   it('増減と変化率', () => {
     expect(change(150, 100)).toEqual({ diff: 50, ratio: 0.5 });
     expect(change(100, 0)).toEqual({ diff: 100, ratio: null });
@@ -75,30 +75,5 @@ describe('change / byInstitution / stableSlots', () => {
       { name: 'カード', income: 0, expense: 800, count: 2 },
       { name: '銀行', income: 1000, expense: 0, count: 1 },
     ]);
-  });
-  it('色の枠は金額順で固定、枠外は割り当てない', () => {
-    const s = stableSlots([{ name: 'B', amount: 10 }, { name: 'A', amount: 30 }, { name: 'C', amount: 5 }], 2);
-    expect(s.get('A')).toBe(0);
-    expect(s.get('B')).toBe(1);
-    expect(s.has('C')).toBe(false);
-  });
-});
-
-describe('assignSlots', () => {
-  const preferred = new Map([
-    ['食費', 0],
-    ['住宅', 1],
-    ['未分類', 2],
-  ]);
-  it('その月の上位項目には必ず色を割り当て、全期間で決まっている色はできるだけ維持する', () => {
-    const s = assignSlots(['税', '住宅', '食費', '保険'], preferred, 3);
-    expect(s.get('住宅')).toBe(1);
-    expect(s.get('食費')).toBe(0);
-    expect(s.get('税')).toBe(2); // 空いている色
-    expect(s.has('保険')).toBe(false); // 上位3つに入らないので「その他」
-  });
-  it('上位に入らない項目の色は使わない', () => {
-    const s = assignSlots(['A', 'B'], preferred, 3);
-    expect([...s.values()].sort()).toEqual([0, 1]);
   });
 });
