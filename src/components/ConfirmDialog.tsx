@@ -50,7 +50,7 @@ export function ConfirmDialog({ open, title, message, confirmLabel, danger, requ
                 setText('');
               }
             }}
-            className={`h-11 flex-1 rounded-lg font-bold text-white disabled:opacity-40 ${danger ? 'bg-danger' : 'bg-accent'}`}
+            className={`h-11 flex-1 rounded-lg font-bold disabled:opacity-40 ${danger ? 'bg-danger text-white' : 'bg-accent text-on-accent'}`}
           >
             {busy ? '処理中…' : confirmLabel}
           </button>

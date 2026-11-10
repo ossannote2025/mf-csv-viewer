@@ -7,10 +7,10 @@ import { expenseByCategory } from '../../lib/aggregate';
 import { formatYm } from '../../lib/date';
 import { monthRange } from '../../lib/filter';
 import { formatYen } from '../../lib/format';
-import { assignSlots, stableSlots } from '../../lib/series';
+import { categoryColor, rankIndex, shadeColor } from '../../lib/categoryColors';
+import { usePrefersDark } from '../../hooks/usePrefersDark';
 import { useMonthData } from '../../hooks/useMonthData';
 import { useAppStore } from '../../store/useAppStore';
-import { OTHER, SERIES } from './chartTheme';
 
 /** 支出の内訳（大項目 → 中項目 → 明細）のドーナツグラフ */
 export function BreakdownView() {
@@ -25,29 +25,20 @@ export function BreakdownView() {
     () => (large ? expenseByCategory(list.filter((t) => t.large === large), excluded, 'middle') : expenseByCategory(list, excluded, 'large')),
     [list, excluded, large],
   );
-  // 色は全期間の金額順で項目ごとに決めておき（月を変えても同じ項目はなるべく同じ色）、
-  // そのうえで表示中の月の上位7項目には必ず色を付ける。8位以下は「その他」（灰色）
-  const preferred = useMemo(() => {
-    const all = large ? transactions.filter((t) => t.large === large) : transactions;
-    return stableSlots(expenseByCategory(all, excluded, large ? 'middle' : 'large'), SERIES.length);
-  }, [transactions, excluded, large]);
-  const slots = useMemo(() => assignSlots(cats.map((c) => c.name), preferred, SERIES.length), [cats, preferred]);
+  const dark = usePrefersDark();
+  // 中項目は親の大項目の色を明るさ違いで使う。明るさは全期間の金額順で中項目ごとに固定
+  const middleRank = useMemo(
+    () => (large ? rankIndex(expenseByCategory(transactions.filter((t) => t.large === large), excluded, 'middle')) : null),
+    [transactions, excluded, large],
+  );
 
   if (!ym) return null;
   const total = cats.reduce((s, c) => s + c.amount, 0);
   const maxAmount = cats[0]?.amount || 1;
-  const colorOf = (name: string) => {
-    const i = slots.get(name);
-    return i === undefined ? OTHER : SERIES[i];
-  };
-  // ドーナツは色の付く項目＋「その他」にまとめる
-  const slices: { name: string; amount: number; color: string }[] = [];
-  let other = 0;
-  for (const c of cats) {
-    if (slots.has(c.name)) slices.push({ name: c.name, amount: c.amount, color: colorOf(c.name) });
-    else other += c.amount;
-  }
-  if (other > 0) slices.push({ name: 'その他', amount: other, color: OTHER });
+  // 色はカテゴリ名に固定（金額の順位では変わらない）
+  const colorOf = (name: string) =>
+    large ? shadeColor(categoryColor(large, dark), middleRank?.get(name) ?? 0) : categoryColor(name, dark);
+  const slices = cats.map((c) => ({ name: c.name, amount: c.amount, color: colorOf(c.name) }));
 
   const select = (name: string) => {
     if (!large) setLarge(name);
@@ -83,24 +74,24 @@ export function BreakdownView() {
                     data={slices}
                     dataKey="amount"
                     nameKey="name"
-                    innerRadius="62%"
+                    innerRadius="80%"
                     outerRadius="100%"
                     startAngle={90}
                     endAngle={-270}
                     stroke="var(--color-surface)"
                     strokeWidth={2}
                     isAnimationActive={false}
-                    onClick={(d: { name?: string }) => d.name && d.name !== 'その他' && select(d.name)}
+                    onClick={(d: { name?: string }) => d.name && select(d.name)}
                   >
                     {slices.map((s) => (
-                      <Cell key={s.name} fill={s.color} className={s.name === 'その他' ? '' : 'cursor-pointer'} />
+                      <Cell key={s.name} fill={s.color} className="cursor-pointer" />
                     ))}
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-xs text-muted">{large ?? `${formatYm(ym)}の支出`}</span>
-                <span className="tabular text-xl font-bold">{formatYen(total)}</span>
+                <span className="text-xs text-muted">{large ? `${large}の支出` : '支出合計'}</span>
+                <span className="tabular text-2xl font-bold">{formatYen(total)}</span>
               </div>
             </div>
 
@@ -125,11 +116,6 @@ export function BreakdownView() {
                 </li>
               ))}
             </ul>
-            {cats.length > SERIES.length && (
-              <p className="mt-2 text-xs text-muted">
-                グラフでは、{SERIES.length + 1}位以下の{cats.length - SERIES.length}項目を「その他」（灰色）にまとめています。
-              </p>
-            )}
             <p className="mt-1 text-xs text-muted">
               {large ? '中項目をタップすると、その明細の一覧を表示します。' : '大項目をタップすると、中項目の内訳を表示します。'}
             </p>

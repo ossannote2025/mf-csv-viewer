@@ -80,7 +80,7 @@ export function RuleEditor({ rule, isNew, onClose }: Props) {
                 削除
               </button>
             )}
-            <button type="button" disabled={!canSave} onClick={save} className="h-12 flex-[2] rounded-xl bg-accent font-bold text-white disabled:opacity-40">
+            <button type="button" disabled={!canSave} onClick={save} className="h-12 flex-[2] rounded-xl bg-accent font-bold text-on-accent disabled:opacity-40">
               保存
             </button>
           </div>

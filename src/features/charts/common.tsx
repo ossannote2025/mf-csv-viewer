@@ -16,7 +16,7 @@ export function RangeChips() {
           type="button"
           aria-pressed={p.value === value}
           onClick={() => onChange(p.value)}
-          className={`min-h-11 shrink-0 rounded-full border px-4 text-sm ${p.value === value ? 'border-accent bg-accent font-bold text-white' : 'border-line bg-surface'}`}
+          className={`min-h-11 shrink-0 rounded-full border px-4 text-sm ${p.value === value ? 'border-accent bg-accent font-bold text-on-accent' : 'border-line bg-surface'}`}
         >
           {p.label}
         </button>

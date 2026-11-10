@@ -17,10 +17,7 @@ export default function ChartsTab() {
   const view = useAppStore((s) => s.chartView);
   const setView = useAppStore((s) => s.setChartView);
   return (
-    <Page title="グラフ">
-      <div className="sticky top-[calc(3rem+env(safe-area-inset-top))] z-20 border-b border-line bg-surface/95 px-4 py-2 backdrop-blur">
-        <Segmented value={view} options={VIEWS} onChange={setView} />
-      </div>
+    <Page title="グラフ" sub={<Segmented value={view} options={VIEWS} onChange={setView} tone="onHeader" />}>
       {view === 'breakdown' && <BreakdownView />}
       {view === 'trend' && <TrendView />}
       {view === 'category' && <CategoryView />}

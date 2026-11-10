@@ -5,9 +5,11 @@ import { Card } from '../../components/Page';
 import { expenseByCategory } from '../../lib/aggregate';
 import { formatYm, shiftYm } from '../../lib/date';
 import { formatYen } from '../../lib/format';
-import { categoryMonthMatrix, change, monthlySeries, stableSlots, ymRange } from '../../lib/series';
+import { categoryMonthMatrix, change, monthlySeries, ymRange } from '../../lib/series';
+import { categoryColor, rankIndex, shadeColor } from '../../lib/categoryColors';
+import { usePrefersDark } from '../../hooks/usePrefersDark';
 import { useAppStore } from '../../store/useAppStore';
-import { axisMonth, axisYen, EXPENSE, GRID, MUTED, SERIES } from './chartTheme';
+import { axisMonth, axisYen, EXPENSE, GRID, MUTED } from './chartTheme';
 import { ChartTooltip, RangeChips, ScrollableChart } from './common';
 import { useRangeMonths } from '../../hooks/useRangeMonths';
 
@@ -30,10 +32,19 @@ export function CategoryView() {
     [transactions, excluded, ext, large],
   );
   const totalSeries = useMemo(() => monthlySeries(transactions, excluded, ext).map((p) => p.expense), [transactions, excluded, ext]);
-  const slots = useMemo(() => stableSlots(expenseByCategory(transactions, excluded, 'large'), SERIES.length), [transactions, excluded]);
+  const dark = usePrefersDark();
+  const middleRank = useMemo(
+    () => (large ? rankIndex(expenseByCategory(transactions.filter((t) => t.large === large), excluded, 'middle')) : null),
+    [transactions, excluded, large],
+  );
 
   const values = (middle && middleMatrix?.get(middle)) || (large && largeMatrix.get(large)) || (large ? new Array(ext.length).fill(0) : totalSeries);
-  const color = large && slots.has(large) ? SERIES[slots.get(large)!] : EXPENSE;
+  // 色はカテゴリ名に固定。中項目は親の大項目の色の明るさ違い。支出合計は支出の色
+  const color = large
+    ? middle
+      ? shadeColor(categoryColor(large, dark), middleRank?.get(middle) ?? 0)
+      : categoryColor(large, dark)
+    : EXPENSE;
   const label = middle ? `${large}／${middle}` : large ?? '支出合計';
 
   const rows = months.map((ym, i) => {

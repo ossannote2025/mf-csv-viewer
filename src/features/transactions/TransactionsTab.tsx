@@ -91,7 +91,7 @@ export function TransactionsTab() {
             const csv = toCsv(filtered, excluded, rules);
             void saveFile(new File([csv], exportFileName('mf-csv-viewer-export'), { type: 'text/csv' }));
           }}
-          className="flex h-11 items-center gap-1 px-2 text-sm text-muted disabled:opacity-40"
+          className="flex h-11 items-center gap-1 px-2 text-sm disabled:opacity-40"
           aria-label={`表示中の${filtered.length}件をCSVで書き出す`}
         >
           <DownloadIcon className="size-5" />
@@ -100,7 +100,7 @@ export function TransactionsTab() {
         <button
           type="button"
           onClick={() => setFilter({ showExcluded: !filter.showExcluded })}
-          className="flex h-11 items-center gap-1 px-2 text-sm text-muted"
+          className="flex h-11 items-center gap-1 px-2 text-sm"
           aria-pressed={filter.showExcluded}
         >
           {filter.showExcluded ? <EyeIcon className="size-5" /> : <EyeOffIcon className="size-5" />}
@@ -137,7 +137,7 @@ export function TransactionsTab() {
           <button
             type="button"
             onClick={() => setFilterOpen(true)}
-            className={`relative flex h-11 items-center gap-1 rounded-xl px-3 text-sm font-medium ${nFilters ? 'bg-accent text-white' : 'bg-bg'}`}
+            className={`relative flex h-11 items-center gap-1 rounded-xl px-3 text-sm font-medium ${nFilters ? 'bg-accent text-on-accent' : 'bg-bg'}`}
           >
             <FilterIcon className="size-5" />
             絞り込み

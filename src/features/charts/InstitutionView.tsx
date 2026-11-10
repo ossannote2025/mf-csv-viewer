@@ -47,7 +47,7 @@ export function InstitutionView() {
           type="button"
           aria-pressed={mode === 'month'}
           onClick={() => setMode('month')}
-          className={`min-h-11 shrink-0 rounded-full border px-4 text-sm ${mode === 'month' ? 'border-accent bg-accent font-bold text-white' : 'border-line bg-surface'}`}
+          className={`min-h-11 shrink-0 rounded-full border px-4 text-sm ${mode === 'month' ? 'border-accent bg-accent font-bold text-on-accent' : 'border-line bg-surface'}`}
         >
           月ごと
         </button>
@@ -62,7 +62,7 @@ export function InstitutionView() {
                 setMode('range');
                 setChartRange(p.value);
               }}
-              className={`min-h-11 shrink-0 rounded-full border px-4 text-sm ${on ? 'border-accent bg-accent font-bold text-white' : 'border-line bg-surface'}`}
+              className={`min-h-11 shrink-0 rounded-full border px-4 text-sm ${on ? 'border-accent bg-accent font-bold text-on-accent' : 'border-line bg-surface'}`}
             >
               {p.label}
             </button>

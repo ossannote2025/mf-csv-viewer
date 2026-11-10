@@ -223,7 +223,7 @@ function BackupSection() {
         type="button"
         disabled={!hasData}
         onClick={doExport}
-        className="h-12 w-full rounded-xl bg-accent font-bold text-white disabled:opacity-40"
+        className="h-12 w-full rounded-xl bg-accent font-bold text-on-accent disabled:opacity-40"
       >
         バックアップを書き出す
       </button>
