@@ -1,6 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import type { MonthInfo } from '../lib/aggregate';
-import { detectSwipe, monthAfterSwipe, SWIPE_EDGE } from '../lib/swipe';
+import { detectSwipe, periodAfterSwipe, SWIPE_EDGE } from '../lib/swipe';
 
 /** ホーム画面から開いた PWA か（PWA には画面端の「戻る」ジェスチャーがない） */
 function isStandalone() {
@@ -17,27 +16,27 @@ function inHorizontalScroller(target: EventTarget | null, root: HTMLElement) {
 }
 
 /**
- * 左右スワイプで前後の月に移動する範囲。months は新しい順。
- * 月が変わったときは、内容を移動の向きに少しスライドさせて切り替わったことを示す。
+ * 左右スワイプで前後の期間（月・年）に移動する範囲。values は新しい順（例：'2026-11' や '2026'）。
+ * 期間が変わったときは、内容を移動の向きに少しスライドさせて切り替わったことを示す。
  */
-export function MonthSwipeArea({
-  months,
+export function PeriodSwipeArea({
+  values,
   value,
   onChange,
   disabled = false,
   children,
 }: {
-  months: MonthInfo[];
+  values: readonly string[];
   value: string;
-  onChange: (ym: string) => void;
+  onChange: (value: string) => void;
   /** true のあいだはスワイプに反応しない（期間指定の表示中など） */
   disabled?: boolean;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const latest = useRef({ months, value, onChange, disabled });
+  const latest = useRef({ values, value, onChange, disabled });
   useEffect(() => {
-    latest.current = { months, value, onChange, disabled };
+    latest.current = { values, value, onChange, disabled };
   });
 
   useEffect(() => {
@@ -59,8 +58,8 @@ export function MonthSwipeArea({
       const dir = detectSwipe(start, { x: t.clientX, y: t.clientY }, { edge: isStandalone() ? 0 : SWIPE_EDGE, viewportWidth: window.innerWidth });
       start = null;
       if (!dir) return;
-      const { months, value, onChange } = latest.current;
-      const next = monthAfterSwipe(months, value, dir);
+      const { values, value, onChange } = latest.current;
+      const next = periodAfterSwipe(values, value, dir);
       if (next) onChange(next);
     };
     const onCancel = () => {
@@ -78,7 +77,7 @@ export function MonthSwipeArea({
     };
   }, []);
 
-  // 月が変わったら（スワイプ・矢印・一覧のどれでも）短くスライドさせる
+  // 期間が変わったら（スワイプ・矢印・一覧のどれでも）短くスライドさせる
   const prevValue = useRef(value);
   useEffect(() => {
     const before = prevValue.current;
@@ -86,7 +85,7 @@ export function MonthSwipeArea({
     const el = ref.current;
     if (before === value || !el || typeof el.animate !== 'function') return;
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-    const from = value > before ? 24 : -24; // 新しい月は右から、古い月は左から入る
+    const from = value > before ? 24 : -24; // 新しい期間は右から、古い期間は左から入る（'YYYY-MM' / 'YYYY' は文字列で比べられる）
     el.animate(
       [
         { transform: `translateX(${from}px)`, opacity: 0.4 },

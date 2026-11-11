@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectSwipe, monthAfterSwipe } from './swipe';
+import { detectSwipe, periodAfterSwipe } from './swipe';
 
 describe('detectSwipe', () => {
   const o = { x: 200, y: 300 };
@@ -26,21 +26,28 @@ describe('detectSwipe', () => {
   });
 });
 
-describe('monthAfterSwipe', () => {
+describe('periodAfterSwipe', () => {
   // 新しい順
-  const months = [{ ym: '2026-03' }, { ym: '2026-02' }, { ym: '2026-01' }];
+  const months = ['2026-03', '2026-02', '2026-01'];
 
   it('左へは次の月、右へは前の月', () => {
-    expect(monthAfterSwipe(months, '2026-02', 'left')).toBe('2026-03');
-    expect(monthAfterSwipe(months, '2026-02', 'right')).toBe('2026-01');
+    expect(periodAfterSwipe(months, '2026-02', 'left')).toBe('2026-03');
+    expect(periodAfterSwipe(months, '2026-02', 'right')).toBe('2026-01');
   });
 
   it('端の月ではそれ以上動かない', () => {
-    expect(monthAfterSwipe(months, '2026-03', 'left')).toBeNull();
-    expect(monthAfterSwipe(months, '2026-01', 'right')).toBeNull();
+    expect(periodAfterSwipe(months, '2026-03', 'left')).toBeNull();
+    expect(periodAfterSwipe(months, '2026-01', 'right')).toBeNull();
   });
 
   it('一覧にない月は null', () => {
-    expect(monthAfterSwipe(months, '2025-12', 'left')).toBeNull();
+    expect(periodAfterSwipe(months, '2025-12', 'left')).toBeNull();
+  });
+
+  it('年でも同じように動く', () => {
+    const years = ['2026', '2025', '2024'];
+    expect(periodAfterSwipe(years, '2025', 'left')).toBe('2026');
+    expect(periodAfterSwipe(years, '2025', 'right')).toBe('2024');
+    expect(periodAfterSwipe(years, '2024', 'right')).toBeNull();
   });
 });
