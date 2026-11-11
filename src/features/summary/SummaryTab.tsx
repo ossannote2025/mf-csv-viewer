@@ -4,6 +4,7 @@ import { Segmented } from '../../components/Chips';
 import { YearReport } from './YearReport';
 import { ChangeText } from '../../components/ChangeText';
 import { MonthPicker } from '../../components/MonthPicker';
+import { MonthSwipeArea } from '../../components/MonthSwipeArea';
 import { Card, Page } from '../../components/Page';
 import { expenseByCategory, totals } from '../../lib/aggregate';
 import { shiftYm } from '../../lib/date';
@@ -69,7 +70,7 @@ function MonthlyReport() {
   ];
 
   return (
-    <>
+    <MonthSwipeArea months={months} value={ym} onChange={setSummaryYm}>
       <div className="mx-4 mt-4">
         <MonthPicker months={months} value={ym} onChange={setSummaryYm} />
       </div>
@@ -158,6 +159,6 @@ function MonthlyReport() {
           </ul>
         )}
       </Card>
-    </>
+    </MonthSwipeArea>
   );
 }

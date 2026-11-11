@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from 'recharts';
 import { MonthPicker } from '../../components/MonthPicker';
+import { MonthSwipeArea } from '../../components/MonthSwipeArea';
 import { Card } from '../../components/Page';
 import { formatYm } from '../../lib/date';
 import { monthRange } from '../../lib/filter';
@@ -69,64 +70,67 @@ export function InstitutionView() {
           );
         })}
       </div>
-      {mode === 'month' && (
-        <div className="mx-4 mt-3">
-          <MonthPicker months={months} value={ym} onChange={setSummaryYm} />
-        </div>
-      )}
-
-      <Card title={`金融機関別の支出（${period.label}）`}>
-        {expenseRows.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted">この期間の支出はありません。</p>
-        ) : (
-          <div ref={ref}>
-            {width > 0 && (
-              <BarChart width={width} height={expenseRows.length * 36 + 24} data={expenseRows} layout="vertical" margin={{ top: 0, right: 12, bottom: 0, left: 0 }}>
-                <CartesianGrid horizontal={false} stroke={GRID} />
-                <XAxis type="number" tickFormatter={axisYen} tick={{ fontSize: 11, fill: MUTED }} tickLine={false} axisLine={false} />
-                <YAxis type="category" dataKey="name" width={Math.min(120, width * 0.35)} tick={{ fontSize: 12, fill: MUTED }} tickLine={false} axisLine={false} />
-                <Tooltip
-                  cursor={{ fill: 'var(--color-hover)' }}
-                  content={({ active, payload }) => {
-                    const p = active && payload?.[0]?.payload;
-                    return p ? <ChartTooltip title={p.name} rows={[{ label: '支出', value: p.expense, color: EXPENSE }]} /> : null;
-                  }}
-                />
-                <Bar dataKey="expense" fill={EXPENSE} radius={[0, 4, 4, 0]} barSize={20} isAnimationActive={false} />
-              </BarChart>
-            )}
+      <MonthSwipeArea disabled={mode !== 'month'} months={months} value={ym} onChange={setSummaryYm}>
+        {mode === 'month' && (
+          <div className="mx-4 mt-3">
+            <MonthPicker months={months} value={ym} onChange={setSummaryYm} />
           </div>
         )}
-      </Card>
 
-      <Card title="一覧">
-        <table className="tabular w-full text-sm">
-          <thead>
-            <tr className="text-xs text-muted">
-              <th className="py-1 text-left font-normal">金融機関</th>
-              <th className="py-1 text-right font-normal">支出</th>
-              <th className="py-1 text-right font-normal">収入</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-line">
-            {rows.map((r) => (
-              <tr
-                key={r.name}
-                onClick={() => showTransactions({ dateFrom: period.dateFrom, dateTo: period.dateTo, institutions: [r.name] })}
-                className="cursor-pointer active:bg-bg"
-              >
-                <td className="py-2.5">
-                  <span className="block max-w-40 truncate">{r.name}</span>
-                  <span className="text-xs text-muted">{formatCount(r.count)}</span>
-                </td>
-                <td className="py-2.5 text-right text-expense">{r.expense ? formatYen(r.expense) : '—'}</td>
-                <td className="py-2.5 text-right text-income">{r.income ? formatYen(r.income) : '—'}</td>
+        <Card title={`金融機関別の支出（${period.label}）`}>
+          {expenseRows.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted">この期間の支出はありません。</p>
+          ) : (
+            <div ref={ref}>
+              {width > 0 && (
+                <BarChart width={width} height={expenseRows.length * 36 + 24} data={expenseRows} layout="vertical" margin={{ top: 0, right: 12, bottom: 0, left: 0 }}>
+                  <CartesianGrid horizontal={false} stroke={GRID} />
+                  <XAxis type="number" tickFormatter={axisYen} tick={{ fontSize: 11, fill: MUTED }} tickLine={false} axisLine={false} />
+                  <YAxis type="category" dataKey="name" width={Math.min(120, width * 0.35)} tick={{ fontSize: 12, fill: MUTED }} tickLine={false} axisLine={false} />
+                  <Tooltip
+                    cursor={{ fill: 'var(--color-hover)' }}
+                    content={({ active, payload }) => {
+                      const p = active && payload?.[0]?.payload;
+                      return p ? <ChartTooltip title={p.name} rows={[{ label: '支出', value: p.expense, color: EXPENSE }]} /> : null;
+                    }}
+                  />
+                  <Bar dataKey="expense" fill={EXPENSE} radius={[0, 4, 4, 0]} barSize={20} isAnimationActive={false} />
+                </BarChart>
+              )}
+            </div>
+          )}
+        </Card>
+
+        <Card title="一覧">
+          <table className="tabular w-full text-sm">
+            <thead>
+              <tr className="text-xs text-muted">
+                <th className="py-1 text-left font-normal">金融機関</th>
+                <th className="py-1 text-right font-normal">支出</th>
+                <th className="py-1 text-right font-normal">収入</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        <p className="mt-2 text-xs text-muted">除外された明細（振替・除外ルール）は含みません。金融機関をタップすると明細を表示します。</p>
-      </Card>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {rows.map((r) => (
+                <tr
+                  key={r.name}
+                  onClick={() => showTransactions({ dateFrom: period.dateFrom, dateTo: period.dateTo, institutions: [r.name] })}
+                  className="cursor-pointer active:bg-bg"
+                >
+                  <td className="py-2.5">
+                    <span className="block max-w-40 truncate">{r.name}</span>
+                    <span className="text-xs text-muted">{formatCount(r.count)}</span>
+                  </td>
+                  <td className="py-2.5 text-right text-expense">{r.expense ? formatYen(r.expense) : '—'}</td>
+                  <td className="py-2.5 text-right text-income">{r.income ? formatYen(r.income) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="mt-2 text-xs text-muted">除外された明細（振替・除外ルール）は含みません。金融機関をタップすると明細を表示します。</p>
+        </Card>
+      </MonthSwipeArea>
     </>
   );
 }
+
