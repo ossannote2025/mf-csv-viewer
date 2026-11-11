@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts';
 import { ChevronLeft, ChevronRight } from '../../components/Icons';
 import { MonthPicker } from '../../components/MonthPicker';
+import { MonthSwipeArea } from '../../components/MonthSwipeArea';
 import { Card } from '../../components/Page';
 import { expenseByCategory } from '../../lib/aggregate';
 import { formatYm } from '../../lib/date';
@@ -46,7 +47,7 @@ export function BreakdownView() {
   };
 
   return (
-    <>
+    <MonthSwipeArea months={months} value={ym} onChange={setSummaryYm}>
       <div className="mx-4 mt-4">
         <MonthPicker months={months} value={ym} onChange={setSummaryYm} />
       </div>
@@ -122,6 +123,6 @@ export function BreakdownView() {
           </>
         )}
       </Card>
-    </>
+    </MonthSwipeArea>
   );
 }
