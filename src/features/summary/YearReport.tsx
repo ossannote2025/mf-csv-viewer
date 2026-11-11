@@ -3,6 +3,7 @@ import { Amount } from '../../components/Amount';
 import { ChangeText } from '../../components/ChangeText';
 import { ChevronLeft, ChevronRight } from '../../components/Icons';
 import { Card } from '../../components/Page';
+import { PeriodSwipeArea } from '../../components/PeriodSwipeArea';
 import { formatYen } from '../../lib/format';
 import { change, monthlySeries, ymRange } from '../../lib/series';
 import { monthsWithData, transactionsOfYear, transactionsOfYearMonths, yearlyTotals } from '../../lib/yearly';
@@ -20,6 +21,7 @@ export function YearReport() {
   const showTransactions = useAppStore((s) => s.showTransactions);
 
   const years = useMemo(() => yearlyTotals(transactions, excluded), [transactions, excluded]);
+  const yearValues = useMemo(() => years.map((y) => y.year), [years]);
   const year = selected && years.some((y) => y.year === selected) ? selected : years[0]?.year;
   const idx = years.findIndex((y) => y.year === year);
   const cur = years[idx];
@@ -49,7 +51,7 @@ export function YearReport() {
   const yearRange = { dateFrom: `${year}-01-01`, dateTo: `${year}-12-31` };
 
   return (
-    <>
+    <PeriodSwipeArea values={yearValues} value={year} onChange={setYear}>
       <div className="mx-4 mt-4 flex items-center gap-2">
         <button
           type="button"
@@ -234,6 +236,6 @@ export function YearReport() {
           ))}
         </ul>
       </Card>
-    </>
+    </PeriodSwipeArea>
   );
 }

@@ -1,4 +1,4 @@
-/** 左右スワイプの判定（純粋関数）。月の切り替えに使う */
+/** 左右スワイプの判定（純粋関数）。月・年の切り替えに使う */
 
 export type SwipeDirection = 'left' | 'right';
 
@@ -35,12 +35,12 @@ export function detectSwipe(
 }
 
 /**
- * スワイプの向きから移動先の月を返す（months は新しい順）。
- * 左へスワイプ → 次の月（新しい月）、右へスワイプ → 前の月（古い月）。端の月では null。
+ * スワイプの向きから移動先の期間（月・年）を返す（values は新しい順）。
+ * 左へスワイプ → 次（新しい方）、右へスワイプ → 前（古い方）。端では null。
  */
-export function monthAfterSwipe(months: readonly { ym: string }[], current: string, dir: SwipeDirection): string | null {
-  const idx = months.findIndex((m) => m.ym === current);
+export function periodAfterSwipe(values: readonly string[], current: string, dir: SwipeDirection): string | null {
+  const idx = values.indexOf(current);
   if (idx < 0) return null;
   const next = dir === 'left' ? idx - 1 : idx + 1;
-  return months[next]?.ym ?? null;
+  return values[next] ?? null;
 }

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from 'recharts';
 import { MonthPicker } from '../../components/MonthPicker';
-import { MonthSwipeArea } from '../../components/MonthSwipeArea';
+import { PeriodSwipeArea } from '../../components/PeriodSwipeArea';
 import { Card } from '../../components/Page';
 import { formatYm } from '../../lib/date';
 import { monthRange } from '../../lib/filter';
@@ -16,7 +16,7 @@ import { ChartTooltip } from './common';
 
 /** 金融機関別の集計 */
 export function InstitutionView() {
-  const { transactions, months, byMonth, ym } = useMonthData();
+  const { transactions, months, monthValues, byMonth, ym } = useMonthData();
   const excluded = useAppStore((s) => s.excluded);
   const chartRange = useAppStore((s) => s.chartRange);
   const setChartRange = useAppStore((s) => s.setChartRange);
@@ -70,7 +70,7 @@ export function InstitutionView() {
           );
         })}
       </div>
-      <MonthSwipeArea disabled={mode !== 'month'} months={months} value={ym} onChange={setSummaryYm}>
+      <PeriodSwipeArea disabled={mode !== 'month'} values={monthValues} value={ym} onChange={setSummaryYm}>
         {mode === 'month' && (
           <div className="mx-4 mt-3">
             <MonthPicker months={months} value={ym} onChange={setSummaryYm} />
@@ -129,7 +129,7 @@ export function InstitutionView() {
           </table>
           <p className="mt-2 text-xs text-muted">除外された明細（振替・除外ルール）は含みません。金融機関をタップすると明細を表示します。</p>
         </Card>
-      </MonthSwipeArea>
+      </PeriodSwipeArea>
     </>
   );
 }

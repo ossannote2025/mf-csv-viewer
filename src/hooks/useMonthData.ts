@@ -8,6 +8,8 @@ export function useMonthData() {
   const summaryYm = useAppStore((s) => s.summaryYm);
   const months = useMemo(() => listMonths(transactions), [transactions]);
   const byMonth = useMemo(() => groupByMonth(transactions), [transactions]);
+  /** 月の値だけの一覧（新しい順。スワイプでの切り替えに使う） */
+  const monthValues = useMemo(() => months.map((m) => m.ym), [months]);
   const ym = summaryYm && byMonth.has(summaryYm) ? summaryYm : months[0]?.ym;
-  return { transactions, months, byMonth, ym };
+  return { transactions, months, monthValues, byMonth, ym };
 }
