@@ -124,7 +124,7 @@ export function YearReport() {
                   <br />（{k === 'income' ? '収入' : k === 'expense' ? '支出' : '収支'}）
                 </dt>
                 <dd className="mt-0.5">
-                  <ChangeText c={change(cur[k], prev[k])} showRatio={false} />
+                  <ChangeText c={change(cur[k], prev[k])} kind={k} showRatio={false} />
                 </dd>
               </div>
             ))}
@@ -154,7 +154,7 @@ export function YearReport() {
                       <span>{cur.expense > 0 ? `${Math.round((c.amount / cur.expense) * 1000) / 10}%` : ''}・月平均 {formatYen(c.amount / cur.months)}</span>
                       {hasPrev && (
                         <span>
-                          {cmpLabel} <ChangeText c={change(c.amount, c.last ?? 0)} showRatio={false} />
+                          {cmpLabel} <ChangeText c={change(c.amount, c.last ?? 0)} kind="expense" showRatio={false} />
                         </span>
                       )}
                     </span>

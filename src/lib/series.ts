@@ -88,6 +88,14 @@ export function change(current: number, previous: number | undefined): Change | 
   return { diff: current - previous, ratio: previous === 0 ? null : (current - previous) / previous };
 }
 
+/** 増減が家計にとって良い変化か。支出は増加が悪い変化、収入・収支は増加が良い変化 */
+export type ChangeTone = 'good' | 'bad' | 'neutral';
+export function changeTone(c: Change | null, kind: 'income' | 'expense' | 'balance'): ChangeTone {
+  if (!c || c.diff === 0) return 'neutral';
+  const up = c.diff > 0;
+  return (kind === 'expense' ? !up : up) ? 'good' : 'bad';
+}
+
 export interface InstitutionTotal {
   name: string;
   income: number;

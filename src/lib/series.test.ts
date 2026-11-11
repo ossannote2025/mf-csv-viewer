@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { byInstitution, categoryMonthMatrix, change, monthlySeries, presetRange, ymRange } from './series';
+import { byInstitution, categoryMonthMatrix, change, changeTone, monthlySeries, presetRange, ymRange } from './series';
 import type { ExclusionMap, Transaction } from './types';
 
 let n = 0;
@@ -75,5 +75,22 @@ describe('change / byInstitution', () => {
       { name: 'カード', income: 0, expense: 800, count: 2 },
       { name: '銀行', income: 1000, expense: 0, count: 1 },
     ]);
+  });
+});
+
+describe('changeTone', () => {
+  it('支出は増加が悪い変化、減少が良い変化', () => {
+    expect(changeTone(change(1200, 1000), 'expense')).toBe('bad');
+    expect(changeTone(change(800, 1000), 'expense')).toBe('good');
+  });
+  it('収入・収支は増加が良い変化、減少が悪い変化', () => {
+    expect(changeTone(change(1200, 1000), 'income')).toBe('good');
+    expect(changeTone(change(800, 1000), 'income')).toBe('bad');
+    expect(changeTone(change(-100, -500), 'balance')).toBe('good');
+    expect(changeTone(change(-500, 100), 'balance')).toBe('bad');
+  });
+  it('増減なし・比較対象なしは中立', () => {
+    expect(changeTone(change(1000, 1000), 'expense')).toBe('neutral');
+    expect(changeTone(null, 'income')).toBe('neutral');
   });
 });
