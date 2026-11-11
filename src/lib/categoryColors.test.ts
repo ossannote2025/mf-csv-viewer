@@ -6,11 +6,22 @@ describe('カテゴリ色', () => {
     expect(categoryColor('食費')).toBe('#3E6A9E');
     expect(categoryColor('住宅')).toBe('#B9785A');
     expect(categoryColor('その他')).toBe('#A3A29C');
-    expect(Object.keys(CATEGORY_COLORS)).toHaveLength(14);
+    expect(Object.keys(CATEGORY_COLORS)).toHaveLength(18);
   });
   it('定義にないカテゴリは「その他」と同じ色', () => {
-    expect(categoryColor('税・社会保障')).toBe(DEFAULT_CATEGORY_COLOR);
-    expect(categoryColor('未分類')).toBe('#A3A29C');
+    expect(categoryColor('未定義のカテゴリ')).toBe(DEFAULT_CATEGORY_COLOR);
+    expect(DEFAULT_CATEGORY_COLOR).toBe(CATEGORY_COLORS['その他']);
+  });
+  it('水道・光熱費・税・社会保障・交際費・未分類にも色がある', () => {
+    expect(categoryColor('水道・光熱費')).toBe('#DE8A2A');
+    expect(categoryColor('税・社会保障')).toBe('#544C7A');
+    expect(categoryColor('交際費')).toBe('#B35C9B');
+    expect(categoryColor('未分類')).toBe('#6E6D68');
+    expect(categoryColor('未分類')).not.toBe(categoryColor('その他'));
+  });
+  it('大項目の色はすべて別の色', () => {
+    const colors = Object.values(CATEGORY_COLORS);
+    expect(new Set(colors).size).toBe(colors.length);
   });
   it('ダークモードは白を18%混ぜる', () => {
     expect(categoryColor('食費', true)).toBe('#6185AF');
