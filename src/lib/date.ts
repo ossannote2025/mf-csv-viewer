@@ -17,11 +17,11 @@ export function formatYm(ym: string): string {
   return `${y}年${Number(m)}月`;
 }
 
-/** 'YYYY-MM-DD' → 'M/D（曜）' */
+/** 'YYYY-MM-DD' → 'YYYY/M/D（曜）'（年をまたいだ検索でも年が分かるよう、常に年を付ける） */
 export function formatDay(date: string): string {
   const [y, m, d] = date.split('-').map(Number);
   const w = '日月火水木金土'[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
-  return `${m}/${d}（${w}）`;
+  return `${y}/${m}/${d}（${w}）`;
 }
 
 /** 'YYYY-MM-DD' → 'YYYY/M/D' */
