@@ -114,16 +114,16 @@ function MonthlyReport() {
               <tr key={r.key}>
                 <th className="py-2 text-left font-normal">{r.label}</th>
                 <td className="py-2 text-right text-xs">
-                  <ChangeText c={change(sum[r.key], prev?.sum[r.key])} />
+                  <ChangeText c={change(sum[r.key], prev?.sum[r.key])} kind={r.key} />
                 </td>
                 <td className="py-2 text-right text-xs">
-                  <ChangeText c={change(sum[r.key], lastYear?.sum[r.key])} />
+                  <ChangeText c={change(sum[r.key], lastYear?.sum[r.key])} kind={r.key} />
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        <p className="mt-2 text-xs text-muted">▲は増加、▼は減少。比較する月のデータがない場合は「—」です。</p>
+        <p className="mt-2 text-xs text-muted">▲は増加、▼は減少。緑は家計に良い変化、赤は注意が必要な変化です。比較する月のデータがない場合は「—」です。</p>
       </Card>
 
       <Card title="支出の内訳（大項目）">
@@ -151,7 +151,7 @@ function MonthlyReport() {
                     <div className="h-full rounded-full bg-expense/70" style={{ width: `${maxCat ? (c.amount / maxCat) * 100 : 0}%` }} />
                   </div>
                   <p className="mt-1 text-right text-[11px] text-muted">
-                    前月比 <ChangeText c={change(c.amount, prev ? prev.cats.get(c.name) ?? 0 : undefined)} showRatio={false} />
+                    前月比 <ChangeText c={change(c.amount, prev ? prev.cats.get(c.name) ?? 0 : undefined)} kind="expense" showRatio={false} />
                   </p>
                 </button>
               </li>

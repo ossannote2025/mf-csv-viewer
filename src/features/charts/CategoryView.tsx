@@ -137,16 +137,16 @@ export function CategoryView() {
                 <td className="py-2 whitespace-nowrap">{formatYm(r.ym).replace('年', '/').replace('月', '')}</td>
                 <td className="py-2 text-right">{formatYen(r.amount)}</td>
                 <td className="py-2 text-right text-xs">
-                  <ChangeText c={r.mom} showRatio={false} />
+                  <ChangeText c={r.mom} kind="expense" showRatio={false} />
                 </td>
                 <td className="py-2 text-right text-xs">
-                  <ChangeText c={r.yoy} showRatio={false} />
+                  <ChangeText c={r.yoy} kind="expense" showRatio={false} />
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        <p className="mt-2 text-xs text-muted">▲は増加、▼は減少。比較する月のデータがない場合は「—」です。</p>
+        <p className="mt-2 text-xs text-muted">▲は増加、▼は減少。緑は家計に良い変化、赤は注意が必要な変化です。比較する月のデータがない場合は「—」です。</p>
       </Card>
 
       <Card title={large ? `${large}の中項目×月` : '大項目×月'}>
