@@ -71,3 +71,32 @@ describe('importCsvBytes（sample/ の架空データ）', () => {
     expect(s.added).toBe(good.added);
   });
 });
+
+describe('iPhoneアプリから書き出した年ごとのCSV', () => {
+  // iPhoneアプリ版の形式：UTF-8（BOMあり）・ヘッダーや値の多くが引用符なし・空のメモが "" ・1ファイルに1年分（新しい順）
+  const yearly =
+    '﻿計算対象,日付,内容,金額（円）,保有金融機関,大項目,中項目,メモ,振替,ID\n' +
+    '1,2024/12/29,架空高速 みなみIC きたIC,-2050,みどり架空カード,自動車,道路料金,,0,YEAR001\n' +
+    '1,2024/07/15,架空フルーツ店 ゼリー詰め合わせ(9個入),-3990,架空モール,交際費,プレゼント代,"",0,YEAR002\n' +
+    '1,2024/07/15,架空フルーツ店 ポイント利用,3990,架空モール,未分類,未分類,,0,YEAR003\n' +
+    '1,2024/01/03,架空高速 きたIC みなみIC,-2200,みどり架空カード,自動車,道路料金,,0,YEAR004\n';
+  const bytes = new TextEncoder().encode(yearly);
+
+  it('1ファイルの複数の月をまとめて取り込める', () => {
+    const { result, transactions } = importCsvBytes(bytes, '収入・支出詳細_2024.csv', new Map());
+    expect(result.ok).toBe(true);
+    expect(result.encoding).toBe('utf-8-bom');
+    expect(result.rowErrors).toEqual([]);
+    expect(result.rowCount).toBe(4);
+    expect(result.months).toEqual(['2024-01', '2024-07', '2024-12']);
+    expect(transactions[1]).toMatchObject({ id: 'YEAR002', date: '2024-07-15', amount: -3990, memo: '', large: '交際費' });
+    expect(transactions[2]).toMatchObject({ amount: 3990, large: '未分類', isTarget: true, isTransfer: false });
+  });
+
+  it('Web版の月ごとのCSVと重なっても、IDで重複排除される', () => {
+    const existing = new Map<string, Transaction>([['YEAR002', { ...tx('YEAR002'), date: '2024-07-15', ym: '2024-07' }]]);
+    const { result } = importCsvBytes(bytes, '収入・支出詳細_2024.csv', existing);
+    expect(result).toMatchObject({ added: 3, updated: 1 });
+    expect(existing.size).toBe(4);
+  });
+});
