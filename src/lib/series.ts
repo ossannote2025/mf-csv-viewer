@@ -95,25 +95,3 @@ export function changeTone(c: Change | null, kind: 'income' | 'expense' | 'balan
   const up = c.diff > 0;
   return (kind === 'expense' ? !up : up) ? 'good' : 'bad';
 }
-
-export interface InstitutionTotal {
-  name: string;
-  income: number;
-  expense: number;
-  count: number;
-}
-
-/** 金融機関別の収入・支出（支出の多い順）。除外分は含めない */
-export function byInstitution(transactions: Iterable<Transaction>, excluded: ExclusionMap): InstitutionTotal[] {
-  const map = new Map<string, InstitutionTotal>();
-  for (const t of transactions) {
-    if (excluded.has(t.id)) continue;
-    const name = t.institution || '（不明）';
-    const cur = map.get(name) ?? { name, income: 0, expense: 0, count: 0 };
-    if (t.amount > 0) cur.income += t.amount;
-    else cur.expense += -t.amount;
-    cur.count++;
-    map.set(name, cur);
-  }
-  return [...map.values()].sort((a, b) => b.expense - a.expense || b.income - a.income);
-}
