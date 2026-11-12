@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { byInstitution, categoryMonthMatrix, change, changeTone, monthlySeries, presetRange, ymRange } from './series';
+import { categoryMonthMatrix, change, changeTone, monthlySeries, presetRange, ymRange } from './series';
 import type { ExclusionMap, Transaction } from './types';
 
 let n = 0;
@@ -63,18 +63,11 @@ describe('categoryMonthMatrix', () => {
   });
 });
 
-describe('change / byInstitution', () => {
+describe('change', () => {
   it('増減と変化率', () => {
     expect(change(150, 100)).toEqual({ diff: 50, ratio: 0.5 });
     expect(change(100, 0)).toEqual({ diff: 100, ratio: null });
     expect(change(100, undefined)).toBeNull();
-  });
-  it('金融機関別（支出の多い順）', () => {
-    const ts = [tx({ institution: '銀行', amount: 1000 }), tx({ institution: 'カード', amount: -500 }), tx({ institution: 'カード', amount: -300 })];
-    expect(byInstitution(ts, new Map())).toEqual([
-      { name: 'カード', income: 0, expense: 800, count: 2 },
-      { name: '銀行', income: 1000, expense: 0, count: 1 },
-    ]);
   });
 });
 

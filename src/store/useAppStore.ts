@@ -10,7 +10,7 @@ import { backupFileName, createBackup, parseBackup } from '../lib/backup';
 import { saveFile } from '../lib/saveFile';
 
 export type Tab = 'transactions' | 'charts' | 'summary' | 'settings';
-export type ChartView = 'breakdown' | 'trend' | 'category' | 'institution';
+export type ChartView = 'breakdown' | 'trend' | 'category';
 
 export interface ImportProgress {
   /** read: ファイルの読み込み・解析中、save: 保存中 */
