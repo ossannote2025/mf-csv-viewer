@@ -140,7 +140,7 @@ npm run lint             # ESLint
 npm run build            # 本番ビルド（dist/）
 npm run check:data       # 実データの誤コミットチェック
 npm run generate:sample  # 架空のサンプルCSVを sample/ に再生成
-npm run screenshots      # README の画面イメージ（docs/screenshots/）を架空データで撮り直す（要 Playwright）
+npm run screenshots      # README の画面イメージ（docs/screenshots/）を架空データで撮り直す（要 Playwright・日本語フォント）
 ```
 
 - 技術: Vite + React + TypeScript / Tailwind CSS / Dexie.js（IndexedDB）/ PapaParse / TanStack Virtual / Zustand / Recharts / vite-plugin-pwa

@@ -5,8 +5,11 @@
  * - データはこのスクリプトが作る架空の明細だけを使う（店名・金融機関名・金額はすべて作り物）
  * - 架空の CSV はメモリ上だけで作り、ファイルには保存しない（リポジトリには置かない）
  * - Playwright（Chromium）が必要。見つからないときはメッセージを出して終了する
+ * - 日本語フォント（Noto Sans CJK JP など）が必要。ないと中国語用のフォントで描かれ、漢字の字形が日本語と違って見える
+ *   （例: Ubuntu / Debian なら apt-get install fonts-noto-cjk）
  */
 import { mkdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +28,17 @@ try {
 } catch {
   console.error('Playwright が見つかりません。Playwright と Chromium を用意してから実行してください。');
   process.exit(1);
+}
+
+/** 撮影に使う日本語フォント（iPhone のヒラギノがなければ、Linux でよく使われる Noto Sans CJK JP など） */
+const JA_FONTS = "'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans CJK JP', 'Noto Sans JP', 'IPAPGothic', sans-serif";
+try {
+  const list = execFileSync('fc-list', [':lang=ja', 'family'], { encoding: 'utf8' });
+  if (!/Noto Sans CJK JP|Noto Sans JP|IPAPGothic|Hiragino/.test(list)) {
+    console.warn('注意: 日本語フォントが見つかりません。漢字が中国語の字形で写る可能性があります（例: apt-get install fonts-noto-cjk）。');
+  }
+} catch {
+  // fc-list がない環境（macOS など）はヒラギノがある前提で続ける
 }
 
 // ---- 架空データ ----
@@ -80,6 +94,8 @@ try {
   const page = await browser.newPage({ viewport: { width: 375, height: 740 }, deviceScaleFactor: 2, colorScheme: 'light', serviceWorkers: 'block' });
   await page.goto(url);
   await page.waitForSelector('text=CSVファイルを選ぶ');
+  // アプリのフォント指定は iPhone 向け（ヒラギノ）。撮影環境では日本語フォントを明示し、中国語の字形で描かれないようにする
+  await page.addStyleTag({ content: `html, body, input, button, select, textarea, svg text { font-family: ${JA_FONTS} !important; }` });
   await page.locator('input[type=file]').setInputFiles({ name: `架空データ_${END_YM}.csv`, mimeType: 'text/csv', buffer: Buffer.from(buildCsv()) });
   await page.getByRole('button', { name: 'OK' }).click();
 
