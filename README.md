@@ -5,6 +5,33 @@ iPhone の Safari（ホーム画面に追加）での利用を想定していま
 
 公開URL: https://ossannote2025.github.io/mf-csv-viewer/
 
+## 画面のイメージ
+
+※ 画面の店名・金融機関名・金額はすべて架空のデータです。
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/transactions.png" alt="明細タブ：キーワードで検索した明細の一覧。日付ごとに金額と合計を表示" width="260"><br>
+      <b>明細</b><br>キーワードで検索。件数と収入・支出の合計もすぐ分かります
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/breakdown.png" alt="グラフタブの内訳：大項目別の支出のドーナツグラフと、金額・割合の一覧" width="260"><br>
+      <b>グラフ：内訳</b><br>月ごとの支出をカテゴリ別に。タップで中項目・明細へ
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/trend.png" alt="グラフタブの推移：月別の収入・支出の棒グラフと収支の折れ線、期間の合計と月平均" width="260"><br>
+      <b>グラフ：推移</b><br>月別の収入・支出・収支。期間の合計と月平均も表示
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/year-report.png" alt="集計タブの年間レポート：年の収入・支出・収支の合計と月平均、前年比、支出カテゴリのランキング" width="260"><br>
+      <b>集計：年間レポート</b><br>年の合計・月平均・前年比と、支出カテゴリのランキング
+    </td>
+  </tr>
+</table>
+
 ## 🔒 データはブラウザ内だけに保存されます
 
 - 取り込んだ家計データは、**お使いの端末のブラウザ（IndexedDB）の中だけ**に保存されます。
@@ -113,6 +140,7 @@ npm run lint             # ESLint
 npm run build            # 本番ビルド（dist/）
 npm run check:data       # 実データの誤コミットチェック
 npm run generate:sample  # 架空のサンプルCSVを sample/ に再生成
+npm run screenshots      # README の画面イメージ（docs/screenshots/）を架空データで撮り直す（要 Playwright・日本語フォント）
 ```
 
 - 技術: Vite + React + TypeScript / Tailwind CSS / Dexie.js（IndexedDB）/ PapaParse / TanStack Virtual / Zustand / Recharts / vite-plugin-pwa
