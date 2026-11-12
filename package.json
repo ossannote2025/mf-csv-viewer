@@ -1,7 +1,7 @@
 {
   "name": "mf-csv-viewer",
   "private": true,
-  "version": "0.5.10",
+  "version": "0.5.11",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "check:data": "node scripts/check-no-private-data.mjs",
     "generate:sample": "tsx scripts/generate-sample.ts",
-    "check:css": "node scripts/check-css-vars.mjs"
+    "check:css": "node scripts/check-css-vars.mjs",
+    "screenshots": "npm run build && node scripts/screenshots.mjs"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.14.26",

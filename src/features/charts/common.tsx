@@ -33,10 +33,12 @@ export function ScrollableChart({ count, minPerMonth = 22, height = 240, childre
   const [ref, width] = useElementWidth<HTMLDivElement>();
   const scrollRef = useRef<HTMLDivElement>(null);
   const chartWidth = Math.max(width, count * minPerMonth + 64);
+  // 枠の幅（width）も見る：表示直後は width=0 でグラフが未描画のため、
+  // 幅が決まってグラフを描いたあとに改めて右端（最新月）へ移動する
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollLeft = el.scrollWidth;
-  }, [chartWidth, count]);
+  }, [width, chartWidth, count]);
   return (
     <div ref={ref}>
       {/*
