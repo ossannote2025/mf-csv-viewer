@@ -39,7 +39,12 @@ export function ScrollableChart({ count, minPerMonth = 22, height = 240, childre
   }, [chartWidth, count]);
   return (
     <div ref={ref}>
-      <div ref={scrollRef} className="overflow-x-auto overscroll-x-contain">
+      {/*
+        期間を切り替えてグラフの幅が変わったら、スクロール枠ごと作り直す。
+        iPhone の Safari は、中身が狭くなっても前のスクロール位置を引きずることがあり、
+        グラフの外（空白）が表示されてグラフが消えたように見えるため。
+      */}
+      <div key={chartWidth} ref={scrollRef} className="overflow-x-auto overscroll-x-contain">
         {width > 0 && <div style={{ width: chartWidth, height }}>{children(chartWidth)}</div>}
       </div>
       {chartWidth > width && width > 0 && <p className="mt-1 text-xs text-muted">← 左にスクロールすると過去の月を表示します</p>}
