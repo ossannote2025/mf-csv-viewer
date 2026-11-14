@@ -255,8 +255,11 @@ export function MonthlyPrintReport({ ym }: { ym: string }) {
                 {data.rows.map((r) => (
                   <tr key={r.id}>
                     <td className="mr-col-date">{shortDay(r.date)}</td>
-                    <td>
-                      <div className="mr-clamp">{r.content}</div>
+                    <td className="mr-col-content">
+                      <div className="mr-line">
+                        <span className="mr-line-main">{r.content}</span>
+                        {r.memo && <span className="mr-line-memo">メモ：{r.memo}</span>}
+                      </div>
                     </td>
                     <td className="mr-num">{formatYen(r.amount)}</td>
                     <td className="mr-col-cat">{r.large}</td>

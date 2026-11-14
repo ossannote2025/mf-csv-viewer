@@ -179,6 +179,34 @@
   overflow: hidden;
   overflow-wrap: anywhere;
 }
+/*
+ * 明細一覧の内容＋メモ：1行だけ表示する。
+ * 内容とメモが1行に収まればメモも並べ、収まらなければメモは折り返して見えない2行目に回す（表示しない）。
+ * 内容だけでもはみ出すときは「…」で省略する。スクリプトを使わないので、書き出した HTML ファイルでも同じように動く
+ */
+.mr-paper .mr-col-content {
+  width: 100%;
+  max-width: 0;
+}
+.mr-line {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 1em;
+  height: 1.35em;
+  overflow: hidden;
+}
+.mr-line-main {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mr-line-memo {
+  flex: none;
+  color: var(--mr-muted);
+  white-space: nowrap;
+}
 .mr-paper .mr-col-date,
 .mr-paper .mr-col-cat {
   width: 1%;
