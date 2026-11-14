@@ -46,10 +46,10 @@ npm run check:data  # 実データらしき CSV / JSON がコミットされて�
 ## 技術スタックと構成
 
 - Vite + React + TypeScript / Tailwind CSS v4 / Dexie.js（IndexedDB）/ PapaParse / TanStack Virtual / Zustand / Recharts / vite-plugin-pwa / Vitest
-- `src/lib/` … 純粋なロジック（CSV 解析・文字コード判定・重複排除・除外ルール・集計・バックアップ・CSV 書き出し・カテゴリ色）。**ロジックを足したら必ずユニットテストを書く**
+- `src/lib/` … 純粋なロジック（CSV 解析・文字コード判定・重複排除・除外ルール・二重計上の候補（`doubleCount.ts`）・集計・バックアップ・CSV 書き出し・カテゴリ色）。**ロジックを足したら必ずユニットテストを書く**
 - `src/db/` … Dexie のスキーマ（`schema.ts`）と保存処理（`repo.ts`）
 - `src/store/useAppStore.ts` … アプリの状態。全明細をメモリに持ち、絞り込み・集計はメモリ上で行う。除外ルールの判定結果は `excluded`（明細ID→ルールID）
-- `src/features/` … 画面（transactions / charts / summary / settings / onboarding）
+- `src/features/` … 画面（transactions / charts / summary / settings / onboarding / doubleCount）
 - グラフタブ（Recharts）は遅延読み込み
 
 ## 守るべき仕様
@@ -58,6 +58,8 @@ npm run check:data  # 実データらしき CSV / JSON がコミットされて�
 - CSV の列は**ヘッダー名**で特定する（列順に依存しない）。文字コードは Shift_JIS / UTF-8（BOM あり・なし）を自動判定
 - 明細は **ID で重複排除**（同じ ID は上書き）
 - 除外ルールは**非破壊**（データを消さず、集計から外すだけ）。振替・計算対象外も組み込みルールとして扱う
+- 二重計上の候補は**自動では除外しない**。「除外する」は既存の除外ルールを作るだけ（新しい除外の仕組みを作らない）。「二重ではない」の記録は `dismissed` テーブル（DB version 2）とバックアップ（形式 2）に保存する
+  - カードかどうかは金融機関名で判定（CSV に種類の列がないため）。カード会社の辞書・通販サイトのキーワードは `src/lib/doubleCount.ts` にある
 - **IndexedDB のスキーマを変えるときは `db.version(n+1)` を追加してマイグレーションを書く**。既存の `version(1)` は変更しない。バックアップ JSON の形式を変えるときは `BACKUP_FORMAT` を上げ、古い形式も読めるようにする
 - iPhone の共有シート（`navigator.share`）はタップ直後に呼ぶ必要がある。共有の前に `await` を挟まない（`src/lib/saveFile.ts`）
 - 取り込みは「全ファイルを解析 → まとめて保存」。Safari の IndexedDB はトランザクションの確定ごとの負担が大きいので、ファイルごとに保存しない

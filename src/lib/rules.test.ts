@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BUILTIN_RULES, computeExclusions, ensureBuiltinRules, matchesRule, previewRule } from './rules';
+import { BUILTIN_RULES, computeExclusions, ensureBuiltinRules, matchesRule, previewRule, previewRules } from './rules';
 import type { ExclusionRule, RuleConditions, Transaction } from './types';
 
 function tx(p: Partial<Transaction>): Transaction {
@@ -75,6 +75,11 @@ describe('previewRule / ensureBuiltinRules', () => {
   it('件数と金額を返す', () => {
     const ts = [tx({ amount: -100 }), tx({ amount: 300 }), tx({ amount: -50, large: '住宅' })];
     expect(previewRule(rule({ large: ['食費'] }), ts)).toEqual({ count: 2, income: 300, expense: 100 });
+  });
+  it('複数のルールでは、どれかに当てはまる明細を1回だけ数える', () => {
+    const ts = [tx({ amount: -100 }), tx({ amount: 300 }), tx({ amount: -50, large: '住宅' }), tx({ amount: -7, large: '教養' })];
+    expect(previewRules([rule({ large: ['食費'] }), rule({ flow: 'expense' })], ts)).toEqual({ count: 4, income: 300, expense: 157 });
+    expect(previewRules([], ts)).toEqual({ count: 0, income: 0, expense: 0 });
   });
   it('欠けている組み込みルールを補う', () => {
     expect(ensureBuiltinRules([]).map((r) => r.builtin)).toEqual(['transfer', 'nonTarget']);

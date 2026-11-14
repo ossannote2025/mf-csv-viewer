@@ -3,7 +3,8 @@ import { sortByDateDesc } from '../lib/aggregate';
 import { EMPTY_FILTER, type TransactionFilter } from '../lib/filter';
 import { importCsvBytes, summarize, type FileImportResult, type ImportSummary } from '../lib/importer';
 import { computeExclusions } from '../lib/rules';
-import type { ExclusionMap, ExclusionRule, ImportRecord, Transaction } from '../lib/types';
+import type { DismissedCandidate, ExclusionMap, ExclusionRule, ImportRecord, Transaction } from '../lib/types';
+import { EMPTY_DOUBLE_COUNT, findDoubleCounts, type DoubleCountResult } from '../lib/doubleCount';
 import * as repo from '../db/repo';
 import type { RangePreset } from '../lib/series';
 import { backupFileName, createBackup, parseBackup } from '../lib/backup';
@@ -34,6 +35,12 @@ interface AppState {
   transactions: Transaction[];
   rules: ExclusionRule[];
   excluded: ExclusionMap;
+  /** 「二重ではない」とした二重計上の候補 */
+  dismissed: DismissedCandidate[];
+  /** 二重計上の候補（明細・ルール・dismissed が変わるたびに計算し直す） */
+  doubleCount: DoubleCountResult;
+  /** 二重計上の候補の一覧を開いているか（ym を指定するとその月の候補だけ） */
+  doubleCountSheet: { ym?: string } | null;
   meta: { lastImportAt?: number; lastBackupAt?: number };
   /** 取り込み履歴（バックアップに含める） */
   imports: ImportRecord[];
@@ -69,6 +76,14 @@ interface AppState {
   deleteMonth: (ym: string) => Promise<void>;
   saveRule: (rule: ExclusionRule) => Promise<void>;
   deleteRule: (id: string) => Promise<void>;
+  /** 複数のルールをまとめて保存する（追加のみ） */
+  addRules: (rules: ExclusionRule[]) => Promise<void>;
+  openDoubleCount: (ym?: string) => void;
+  closeDoubleCount: () => void;
+  /** 「二重ではない」：候補を次から出さない */
+  dismissCandidates: (items: DismissedCandidate[]) => Promise<void>;
+  /** 「二重ではない」を取り消す */
+  undismissCandidates: (keys: string[]) => Promise<void>;
   deleteAll: () => Promise<void>;
   /** バックアップを書き出す。iPhoneでは共有シート（「ファイル」に保存）を使う */
   exportBackup: () => Promise<'shared' | 'downloaded' | 'cancelled'>;
@@ -76,8 +91,9 @@ interface AppState {
   restoreBackup: (file: File, mode: 'replace' | 'merge') => Promise<{ count: number }>;
 }
 
-function withExclusions(transactions: Transaction[], rules: ExclusionRule[]) {
-  return { transactions, rules, excluded: computeExclusions(transactions, rules) };
+function withExclusions(transactions: Transaction[], rules: ExclusionRule[], dismissed: DismissedCandidate[]) {
+  const excluded = computeExclusions(transactions, rules);
+  return { transactions, rules, excluded, dismissed, doubleCount: findDoubleCounts(transactions, excluded, dismissed) };
 }
 
 function errorMessage(e: unknown): string {
@@ -89,6 +105,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   transactions: [],
   rules: [],
   excluded: new Map(),
+  dismissed: [],
+  doubleCount: EMPTY_DOUBLE_COUNT,
+  doubleCountSheet: null,
   meta: {},
   imports: [],
   persisted: null,
@@ -103,7 +122,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   init: async () => {
     try {
       const data = await repo.loadAll();
-      set({ status: 'ready', meta: data.meta, imports: data.imports, ...withExclusions(sortByDateDesc(data.transactions), data.rules) });
+      set({ status: 'ready', meta: data.meta, imports: data.imports, ...withExclusions(sortByDateDesc(data.transactions), data.rules, data.dismissed) });
       if (data.transactions.length > 0) set({ tab: 'transactions' });
       repo.requestPersistence().then((persisted) => set({ persisted }));
     } catch (e) {
@@ -176,12 +195,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     // 3. 画面のデータを更新する（保存に失敗したときはDBの内容に合わせ直す）
     if (saveFailed) {
       const loaded = await repo.loadAll();
-      set({ meta: loaded.meta, imports: loaded.imports, ...withExclusions(sortByDateDesc(loaded.transactions), get().rules) });
+      set({ meta: loaded.meta, imports: loaded.imports, ...withExclusions(sortByDateDesc(loaded.transactions), get().rules, get().dismissed) });
     } else if (changed.size > 0) {
       set((s) => ({
         meta: { ...s.meta, lastImportAt: Date.now() },
         imports: [...s.imports, ...newImports],
-        ...withExclusions(sortByDateDesc([...byId.values()]), s.rules),
+        ...withExclusions(sortByDateDesc([...byId.values()]), s.rules, s.dismissed),
       }));
     }
     const t3 = performance.now();
@@ -195,33 +214,62 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   deleteMonth: async (ym) => {
     await repo.deleteMonth(ym);
-    set((s) => withExclusions(s.transactions.filter((t) => t.ym !== ym), s.rules));
+    set((s) => withExclusions(s.transactions.filter((t) => t.ym !== ym), s.rules, s.dismissed));
   },
 
   saveRule: async (rule) => {
     await repo.saveRule(rule);
     set((s) => {
       const rules = s.rules.some((r) => r.id === rule.id) ? s.rules.map((r) => (r.id === rule.id ? rule : r)) : [...s.rules, rule];
-      return withExclusions(s.transactions, rules.sort((a, b) => a.order - b.order));
+      return withExclusions(s.transactions, rules.sort((a, b) => a.order - b.order), s.dismissed);
     });
   },
 
   deleteRule: async (id) => {
     await repo.deleteRule(id);
-    set((s) => withExclusions(s.transactions, s.rules.filter((r) => r.id !== id)));
+    set((s) => withExclusions(s.transactions, s.rules.filter((r) => r.id !== id), s.dismissed));
+  },
+
+  addRules: async (rules) => {
+    if (rules.length === 0) return;
+    await repo.saveRules(rules);
+    set((s) => withExclusions(s.transactions, [...s.rules, ...rules].sort((a, b) => a.order - b.order), s.dismissed));
+  },
+
+  openDoubleCount: (ym) => set({ doubleCountSheet: { ym } }),
+  closeDoubleCount: () => set({ doubleCountSheet: null }),
+
+  dismissCandidates: async (items) => {
+    if (items.length === 0) return;
+    await repo.addDismissed(items);
+    set((s) => {
+      const keys = new Set(items.map((d) => d.key));
+      const dismissed = [...s.dismissed.filter((d) => !keys.has(d.key)), ...items];
+      return { dismissed, doubleCount: findDoubleCounts(s.transactions, s.excluded, dismissed) };
+    });
+  },
+
+  undismissCandidates: async (keys) => {
+    if (keys.length === 0) return;
+    await repo.removeDismissed(keys);
+    set((s) => {
+      const k = new Set(keys);
+      const dismissed = s.dismissed.filter((d) => !k.has(d.key));
+      return { dismissed, doubleCount: findDoubleCounts(s.transactions, s.excluded, dismissed) };
+    });
   },
 
   deleteAll: async () => {
     await repo.deleteAllData();
     const data = await repo.loadAll();
-    set({ meta: {}, imports: [], filter: EMPTY_FILTER, summaryYm: undefined, ...withExclusions([], data.rules) });
+    set({ meta: {}, imports: [], filter: EMPTY_FILTER, summaryYm: undefined, doubleCountSheet: null, ...withExclusions([], data.rules, []) });
   },
 
   exportBackup: async () => {
     // 共有シートはタップ直後に呼ぶ必要があるため、ここまで await を挟まない
-    const { transactions, rules, meta, imports } = get();
+    const { transactions, rules, meta, imports, dismissed } = get();
     const now = Date.now();
-    const json = JSON.stringify(createBackup(transactions, rules, imports, meta, now));
+    const json = JSON.stringify(createBackup(transactions, rules, imports, meta, dismissed, now));
     const name = backupFileName(new Date(now));
     const file = new File([json], name, { type: 'application/json' });
 
@@ -241,7 +289,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       imports: loaded.imports,
       filter: EMPTY_FILTER,
       summaryYm: undefined,
-      ...withExclusions(sortByDateDesc(loaded.transactions), loaded.rules),
+      doubleCountSheet: null,
+      ...withExclusions(sortByDateDesc(loaded.transactions), loaded.rules, loaded.dismissed),
     });
     return { count: data.transactions.length };
   },

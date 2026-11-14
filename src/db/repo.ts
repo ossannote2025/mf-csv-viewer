@@ -1,4 +1,4 @@
-import type { ExclusionRule, ImportRecord, Transaction } from '../lib/types';
+import type { DismissedCandidate, ExclusionRule, ImportRecord, Transaction } from '../lib/types';
 import { ensureBuiltinRules } from '../lib/rules';
 import type { BackupData } from '../lib/backup';
 import { db, type MetaEntry } from './schema';
@@ -8,20 +8,22 @@ export interface LoadedData {
   rules: ExclusionRule[];
   meta: Partial<Record<MetaEntry['key'], number>>;
   imports: ImportRecord[];
+  dismissed: DismissedCandidate[];
 }
 
 export async function loadAll(): Promise<LoadedData> {
-  const [transactions, storedRules, metaRows, imports] = await Promise.all([
+  const [transactions, storedRules, metaRows, imports, dismissed] = await Promise.all([
     db.transactions.toArray(),
     db.rules.toArray(),
     db.meta.toArray(),
     db.imports.orderBy('importedAt').toArray(),
+    db.dismissed.toArray(),
   ]);
   const rules = ensureBuiltinRules(storedRules);
   if (rules.length !== storedRules.length) await db.rules.bulkPut(rules);
   const meta: LoadedData['meta'] = {};
   for (const m of metaRows) meta[m.key] = m.value;
-  return { transactions, rules, meta, imports };
+  return { transactions, rules, meta, imports, dismissed };
 }
 
 export async function saveImported(transactions: Transaction[], record: ImportRecord): Promise<void> {
@@ -69,6 +71,21 @@ export async function deleteRule(id: string): Promise<void> {
   await db.rules.delete(id);
 }
 
+/** 複数のルールをまとめて保存する（二重計上の候補から作るとき） */
+export async function saveRules(rules: ExclusionRule[]): Promise<void> {
+  await db.rules.bulkPut(rules);
+}
+
+/** 「二重ではない」の記録を追加する */
+export async function addDismissed(items: DismissedCandidate[]): Promise<void> {
+  await db.dismissed.bulkPut(items);
+}
+
+/** 「二重ではない」の記録を取り消す */
+export async function removeDismissed(keys: string[]): Promise<void> {
+  await db.dismissed.bulkDelete(keys);
+}
+
 export async function setMeta(key: MetaEntry['key'], value: number): Promise<void> {
   await db.meta.put({ key, value });
 }
@@ -79,22 +96,23 @@ export async function setMeta(key: MetaEntry['key'], value: number): Promise<voi
  * - merge: 現在のデータに追加し、同じIDの明細・ルールはバックアップの内容で上書きする
  */
 export async function restoreBackup(data: BackupData, mode: 'replace' | 'merge'): Promise<void> {
-  await db.transaction('rw', [db.transactions, db.rules, db.imports, db.meta], async () => {
+  await db.transaction('rw', [db.transactions, db.rules, db.imports, db.meta, db.dismissed], async () => {
     if (mode === 'replace') {
-      await Promise.all([db.transactions.clear(), db.rules.clear(), db.imports.clear()]);
+      await Promise.all([db.transactions.clear(), db.rules.clear(), db.imports.clear(), db.dismissed.clear()]);
     }
     await db.transactions.bulkPut(data.transactions);
     await db.rules.bulkPut(data.rules);
+    if (data.dismissed.length) await db.dismissed.bulkPut(data.dismissed);
     if (data.imports.length) await db.imports.bulkAdd(data.imports.map((r) => ({ ...r })));
     if (data.meta.lastImportAt) await db.meta.put({ key: 'lastImportAt', value: data.meta.lastImportAt });
     if (data.exportedAt) await db.meta.put({ key: 'lastBackupAt', value: data.exportedAt });
   });
 }
 
-/** 全データ削除（明細・ルール・履歴・メタ情報） */
+/** 全データ削除（明細・ルール・履歴・メタ情報・「二重ではない」の記録） */
 export async function deleteAllData(): Promise<void> {
-  await db.transaction('rw', [db.transactions, db.rules, db.imports, db.meta], async () => {
-    await Promise.all([db.transactions.clear(), db.rules.clear(), db.imports.clear(), db.meta.clear()]);
+  await db.transaction('rw', [db.transactions, db.rules, db.imports, db.meta, db.dismissed], async () => {
+    await Promise.all([db.transactions.clear(), db.rules.clear(), db.imports.clear(), db.meta.clear(), db.dismissed.clear()]);
   });
 }
 

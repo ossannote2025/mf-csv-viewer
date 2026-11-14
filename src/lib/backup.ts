@@ -1,8 +1,12 @@
-import type { ExclusionRule, ImportRecord, Transaction } from './types';
+import type { DismissedCandidate, ExclusionRule, ImportRecord, Transaction } from './types';
 
 export const BACKUP_APP = 'mf-csv-viewer';
-/** バックアップJSONの形式バージョン。形式を変えたら上げ、古い形式の変換を parseBackup に追加する */
-export const BACKUP_FORMAT = 1;
+/**
+ * バックアップJSONの形式バージョン。形式を変えたら上げ、古い形式の変換を parseBackup に追加する
+ * - 1：明細・除外ルール・取り込み履歴・メタ情報
+ * - 2：「二重ではない」とした二重計上の候補（dismissed）を追加。形式1は dismissed なしとして読む
+ */
+export const BACKUP_FORMAT = 2;
 
 export interface BackupData {
   app: typeof BACKUP_APP;
@@ -12,6 +16,7 @@ export interface BackupData {
   rules: ExclusionRule[];
   imports: ImportRecord[];
   meta: { lastImportAt?: number };
+  dismissed: DismissedCandidate[];
 }
 
 export function createBackup(
@@ -19,6 +24,7 @@ export function createBackup(
   rules: ExclusionRule[],
   imports: ImportRecord[],
   meta: { lastImportAt?: number },
+  dismissed: DismissedCandidate[],
   now = Date.now(),
 ): BackupData {
   return {
@@ -29,6 +35,7 @@ export function createBackup(
     rules,
     imports: imports.map(({ seq: _seq, ...rest }) => (void _seq, rest)),
     meta: { lastImportAt: meta.lastImportAt },
+    dismissed,
   };
 }
 
@@ -86,6 +93,18 @@ function checkRule(r: unknown, i: number): ExclusionRule {
   };
 }
 
+function checkDismissed(list: unknown): DismissedCandidate[] {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((d): d is Record<string, unknown> => isObj(d) && isStr(d.key) && d.key !== '')
+    .map((d): DismissedCandidate => ({
+      key: d.key as string,
+      kind: d.kind === 'duplicate' ? 'duplicate' : 'withdrawal',
+      label: isStr(d.label) ? d.label : '',
+      dismissedAt: isNum(d.dismissedAt) ? d.dismissedAt : 0,
+    }));
+}
+
 /** バックアップJSONの文字列を検証して読み込む。問題があれば日本語のメッセージで BackupError を投げる */
 export function parseBackup(text: string): BackupData {
   let raw: unknown;
@@ -120,6 +139,8 @@ export function parseBackup(text: string): BackupData {
         }))
       : [],
     meta: { lastImportAt: isNum(meta.lastImportAt) ? meta.lastImportAt : undefined },
+    // 形式1には無いので空になる
+    dismissed: checkDismissed(raw.dismissed),
   };
 }
 

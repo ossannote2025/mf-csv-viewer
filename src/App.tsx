@@ -3,6 +3,7 @@ import { Page } from './components/Page';
 import { TabBar } from './components/TabBar';
 import { UpdateBanner } from './components/UpdateBanner';
 import { Onboarding } from './features/onboarding/Onboarding';
+import { DoubleCountSheet } from './features/doubleCount/DoubleCountSheet';
 import { ImportDialogs } from './features/settings/ImportDialogs';
 import { SettingsTab } from './features/settings/SettingsTab';
 import { SummaryTab } from './features/summary/SummaryTab';
@@ -58,6 +59,7 @@ export default function App() {
     <>
       {content}
       {status === 'ready' && <TabBar />}
+      {status === 'ready' && <DoubleCountSheet />}
       <ImportDialogs />
       <UpdateBanner />
     </>

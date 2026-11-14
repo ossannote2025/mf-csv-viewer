@@ -96,6 +96,20 @@ export function previewRule(rule: ExclusionRule, transactions: Transaction[]): {
   return { count, income, expense };
 }
 
+/** 複数のルールのプレビュー：どれかに当てはまる件数と金額合計（同じ明細は1回だけ数える） */
+export function previewRules(rules: ExclusionRule[], transactions: Transaction[]): { count: number; income: number; expense: number } {
+  let count = 0;
+  let income = 0;
+  let expense = 0;
+  for (const t of transactions) {
+    if (!rules.some((r) => matchesRule(r, t))) continue;
+    count++;
+    if (t.amount > 0) income += t.amount;
+    else expense += -t.amount;
+  }
+  return { count, income, expense };
+}
+
 /** DBに保存されたルールに組み込みルールが欠けていれば補う */
 export function ensureBuiltinRules(rules: ExclusionRule[]): ExclusionRule[] {
   const out = [...rules];

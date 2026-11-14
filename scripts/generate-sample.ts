@@ -9,6 +9,8 @@ const BANK = 'さくら架空銀行';
 const BANK2 = 'あおぞら架空信金';
 const CARD = 'みどり架空カード';
 const EMONEY = 'ポケット架空マネー';
+const CARD2 = 'そよかぜ架空カード';
+const EC = '架空通販モール';
 
 // 決定的な乱数（毎回同じデータになるように）
 let seed = 20250801;
@@ -90,15 +92,50 @@ function toCsv(y: number, m: number, rows: Row[], padDate: boolean): string {
   return lines.join('\r\n') + '\r\n';
 }
 
+/**
+ * 二重計上の確認用（2025年11月）：通常の明細に次を加える
+ * - 振替になっていないカード引き落とし：ミドリカード（10月のカード利用額と同額）、半角カナの ｿﾖｶｾﾞｶｰﾄﾞ
+ * - 振替になっている引き落とし（候補にならない）
+ * - 通販とカードの重複（2日差）、4日差・同じ金融機関どうしの組（候補にならない）
+ */
+function doubleCountRows(y: number, m: number, prevCardTotal: number): Row[] {
+  const rows = monthRows(y, m);
+  const w = rows.find((r) => r.content === 'カード引き落とし ミドリカード');
+  if (w) w.amount = -prevCardTotal;
+  const add = (r: Partial<Row> & Pick<Row, 'day' | 'content' | 'amount' | 'inst'>) =>
+    rows.push({ target: 1, large: '未分類', middle: '未分類', memo: '', transfer: 0, ...r });
+  add({ day: 4, content: 'そよかぜ架空ベーカリー', amount: -1280, inst: CARD2, large: '食費', middle: '食料品' });
+  add({ day: 12, content: '架空シネマ', amount: -1900, inst: CARD2, large: '趣味・娯楽', middle: '映画・音楽・ゲーム' });
+  add({ day: 10, content: 'ｿﾖｶｾﾞｶｰﾄﾞ', amount: -24800, inst: BANK2 });
+  add({ day: 15, content: 'ミドリカード 臨時払い', amount: -10000, inst: BANK, transfer: 1 });
+  // 通販とカードの重複（2日差）→ 候補
+  add({ day: 3, content: '架空ワイヤレスイヤホン', amount: -3978, inst: EC, large: '趣味・娯楽', middle: '映画・音楽・ゲーム' });
+  add({ day: 5, content: 'カクウツウハンモール', amount: -3978, inst: CARD, large: '趣味・娯楽', middle: '映画・音楽・ゲーム' });
+  // 4日差 → 候補にならない
+  add({ day: 8, content: '架空ブックカバー', amount: -1198, inst: EC, large: '趣味・娯楽', middle: '本' });
+  add({ day: 12, content: 'カクウツウハンモール', amount: -1198, inst: CARD, large: '趣味・娯楽', middle: '本' });
+  // 同じ金融機関どうし → 候補にならない
+  add({ day: 20, content: '架空電池', amount: -548, inst: EC, large: '日用品', middle: '日用品' });
+  add({ day: 21, content: '架空電池', amount: -548, inst: EC, large: '日用品', middle: '日用品' });
+  return rows.sort((a, b) => b.day - a.day);
+}
+
+/** カードの利用額の合計（請求額の目安。振替・計算対象外も含む） */
+const cardTotal = (rows: Row[]) => -rows.filter((r) => r.inst === CARD).reduce((s, r) => s + r.amount, 0);
+
 mkdirSync('sample', { recursive: true });
-const files: { y: number; m: number; enc: 'sjis' | 'utf8bom' | 'utf8'; pad: boolean }[] = [
+const files: { y: number; m: number; enc: 'sjis' | 'utf8bom' | 'utf8'; pad: boolean; label?: string }[] = [
   { y: 2025, m: 8, enc: 'sjis', pad: true },
   { y: 2025, m: 9, enc: 'utf8bom', pad: false },
   { y: 2025, m: 10, enc: 'utf8', pad: true },
+  { y: 2025, m: 11, enc: 'utf8', pad: true, label: 'doublecount' },
 ];
+let prev: Row[] = [];
 for (const f of files) {
-  const csv = toCsv(f.y, f.m, monthRows(f.y, f.m), f.pad);
-  const name = `sample/mf-sample-${f.y}-${String(f.m).padStart(2, '0')}-${f.enc}.csv`;
+  const rows = f.label === 'doublecount' ? doubleCountRows(f.y, f.m, cardTotal(prev)) : monthRows(f.y, f.m);
+  prev = rows;
+  const csv = toCsv(f.y, f.m, rows, f.pad);
+  const name = `sample/mf-sample-${f.y}-${String(f.m).padStart(2, '0')}-${f.label ? `${f.label}-` : ''}${f.enc}.csv`;
   const buf = f.enc === 'sjis' ? iconv.encode(csv, 'Shift_JIS') : Buffer.from((f.enc === 'utf8bom' ? '\uFEFF' : '') + csv, 'utf-8');
   writeFileSync(name, buf);
   console.log(`生成: ${name}`);
