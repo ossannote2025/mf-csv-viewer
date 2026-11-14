@@ -8,7 +8,6 @@ import { ImportDialogs } from './features/settings/ImportDialogs';
 import { SettingsTab } from './features/settings/SettingsTab';
 import { SummaryTab } from './features/summary/SummaryTab';
 import { TransactionsTab } from './features/transactions/TransactionsTab';
-import { useViewportFix } from './hooks/useViewportFix';
 import { useAppStore } from './store/useAppStore';
 
 // グラフ（Recharts）は大きいので、グラフタブを開いたときに読み込む
@@ -22,8 +21,6 @@ export default function App() {
   const tab = useAppStore((s) => s.tab);
   const hasData = useAppStore((s) => s.transactions.length > 0);
   const init = useAppStore((s) => s.init);
-  // iPhone でキーボード・月の選択を閉じたあと、下のメニューが浮くのを直す
-  useViewportFix();
 
   useEffect(() => {
     void init();
