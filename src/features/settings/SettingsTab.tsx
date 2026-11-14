@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
-import { LockIcon, TrashIcon } from '../../components/Icons';
+import { ChevronRight, LockIcon, TrashIcon } from '../../components/Icons';
 import { Card, Page } from '../../components/Page';
 import { Toggle } from '../../components/Toggle';
 import { dateRange, listMonths } from '../../lib/aggregate';
@@ -14,6 +14,7 @@ import { describeConditions, draftRule } from '../../lib/ruleText';
 import { previewRule } from '../../lib/rules';
 import { backupIsStale, BackupError } from '../../lib/backup';
 import type { ExclusionRule } from '../../lib/types';
+import { countCandidates } from '../../lib/doubleCount';
 
 export function SettingsTab() {
   return (
@@ -150,6 +151,7 @@ function RuleSection() {
 
   return (
     <Card title="除外ルール">
+      <DoubleCountRow />
       <p className="mb-2 text-xs leading-relaxed text-muted">
         ONのルールのどれかに当てはまる明細は、集計に含めません（データは削除されず、明細一覧ではグレーで表示されます）。
       </p>
@@ -186,6 +188,28 @@ function RuleSection() {
       <p className="mt-2 text-xs text-muted">明細を長押し（PCでは右クリック）するか、タップして「この明細から除外ルールを作る」からも作成できます。</p>
       {editing && <RuleEditor rule={editing.rule} isNew={editing.isNew} onClose={() => setEditing(null)} />}
     </Card>
+  );
+}
+
+/** 「⚠ 二重計上の候補 ○件 >」の行（タップで一覧を開く） */
+function DoubleCountRow() {
+  const total = useAppStore((s) => countCandidates(s.doubleCount).total);
+  const open = useAppStore((s) => s.openDoubleCount);
+  const has = total > 0;
+  return (
+    <button
+      type="button"
+      onClick={() => open()}
+      className={`mb-3 flex min-h-12 w-full items-center justify-between gap-2 rounded-xl px-3 text-left text-sm ${
+        has ? 'bg-warn-soft font-bold text-warn-ink' : 'bg-bg text-muted'
+      }`}
+    >
+      <span>
+        {has && <span aria-hidden="true">⚠ </span>}
+        二重計上の候補 <span className="tabular">{formatCount(total)}</span>
+      </span>
+      <ChevronRight className="size-5 shrink-0" />
+    </button>
   );
 }
 

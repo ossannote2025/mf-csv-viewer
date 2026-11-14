@@ -32,13 +32,13 @@ describe('mergeById', () => {
 describe('importCsvBytes（sample/ の架空データ）', () => {
   const files = readdirSync(SAMPLE_DIR).filter((f) => f.endsWith('.csv')).sort();
 
-  it('3か月分・3種類の文字コードを読める', () => {
-    expect(files).toHaveLength(3);
+  it('4か月分・3種類の文字コードを読める', () => {
+    expect(files).toHaveLength(4);
     const existing = new Map<string, Transaction>();
     const results = files.map((f) => importCsvBytes(readFileSync(join(SAMPLE_DIR, f)), f, existing).result);
     expect(results.every((r) => r.ok)).toBe(true);
-    expect(results.map((r) => r.encoding).sort()).toEqual(['shift_jis', 'utf-8', 'utf-8-bom']);
-    expect(results.map((r) => r.months)).toEqual([['2025-08'], ['2025-09'], ['2025-10']]);
+    expect(results.map((r) => r.encoding).sort()).toEqual(['shift_jis', 'utf-8', 'utf-8', 'utf-8-bom']);
+    expect(results.map((r) => r.months)).toEqual([['2025-08'], ['2025-09'], ['2025-10'], ['2025-11']]);
     for (const r of results) {
       expect(r.rowCount).toBeGreaterThanOrEqual(45);
       expect(r.rowErrors).toEqual([]);

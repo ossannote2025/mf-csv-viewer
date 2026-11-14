@@ -1,7 +1,8 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { db } from './schema';
-import { deleteAllData, deleteMonth, loadAll, restoreBackup, saveImportBatch, saveImported } from './repo';
+import Dexie from 'dexie';
+import { db, MfDatabase } from './schema';
+import { addDismissed, deleteAllData, deleteMonth, loadAll, removeDismissed, restoreBackup, saveImportBatch, saveImported, saveRules } from './repo';
 import type { Transaction } from '../lib/types';
 
 function tx(id: string, date: string): Transaction {
@@ -50,6 +51,7 @@ describe('復元', () => {
     rules: [{ id: 'r1', name: 'ルール', enabled: true, order: 10, cond: { large: ['L'] }, createdAt: 0, updatedAt: 0 }],
     imports: [{ fileName: 'f', importedAt: 1, rowCount: 1, added: 1, updated: 0 }],
     meta: { lastImportAt: 5 },
+    dismissed: [{ key: 'd|a|b', kind: 'duplicate' as const, label: '組', dismissedAt: 1 }],
   });
 
   it('置き換え：既存データは消えてバックアップの内容になる', async () => {
@@ -60,6 +62,13 @@ describe('復元', () => {
     expect(d.rules.map((r) => r.id)).toContain('r1');
     expect(d.rules.filter((r) => r.builtin)).toHaveLength(2);
     expect(d.meta.lastBackupAt).toBe(777);
+    expect(d.dismissed.map((x) => x.key)).toEqual(['d|a|b']);
+  });
+
+  it('置き換え：「二重ではない」の記録もバックアップの内容になる', async () => {
+    await addDismissed([{ key: 'w|old|x', kind: 'withdrawal', label: '', dismissedAt: 1 }]);
+    await restoreBackup({ ...backup(['a']), dismissed: [] }, 'replace');
+    expect((await loadAll()).dismissed).toEqual([]);
   });
 
   it('マージ：既存データを残し、同じIDは上書き', async () => {
@@ -68,6 +77,30 @@ describe('復元', () => {
     const d = await loadAll();
     expect(d.transactions.map((t) => t.id).sort()).toEqual(['a', 'b', 'old']);
     expect(d.transactions.find((t) => t.id === 'a')!.date).toBe('2025-08-01');
+  });
+});
+
+describe('二重計上の候補', () => {
+  beforeEach(async () => {
+    await deleteAllData();
+  });
+
+  it('「二重ではない」の記録を追加・取り消しでき、全データ削除で消える', async () => {
+    await addDismissed([
+      { key: 'w|銀行|カード', kind: 'withdrawal', label: 'a', dismissedAt: 1 },
+      { key: 'd|x|y', kind: 'duplicate', label: 'b', dismissedAt: 2 },
+    ]);
+    expect((await loadAll()).dismissed.map((d) => d.key).sort()).toEqual(['d|x|y', 'w|銀行|カード']);
+    await removeDismissed(['d|x|y']);
+    expect((await loadAll()).dismissed.map((d) => d.key)).toEqual(['w|銀行|カード']);
+    await deleteAllData();
+    expect((await loadAll()).dismissed).toEqual([]);
+  });
+
+  it('複数のルールをまとめて保存できる', async () => {
+    const r = (id: string) => ({ id, name: id, enabled: true, order: 10, cond: { large: ['L'] }, createdAt: 0, updatedAt: 0 });
+    await saveRules([r('x'), r('y')]);
+    expect((await loadAll()).rules.map((x) => x.id)).toEqual(expect.arrayContaining(['x', 'y']));
   });
 });
 
@@ -93,5 +126,24 @@ describe('saveImportBatch', () => {
     expect(progress).toEqual([5, 10, 12]);
     expect(d.imports.map((r) => r.fileName)).toEqual(['a', 'b']);
     expect(d.meta.lastImportAt).toBe(20);
+  });
+});
+
+describe('スキーマの更新（version 1 → 2）', () => {
+  it('version 1 のデータを残したまま、「二重ではない」の記録を保存できるようになる', async () => {
+    const name = 'mf-csv-viewer-migration-test';
+    const old = new Dexie(name);
+    old.version(1).stores({ transactions: 'id, ym, date', rules: 'id, order', imports: '++seq, importedAt', meta: 'key' });
+    await old.table('transactions').put(tx('keep', '2025-08-01'));
+    old.close();
+
+    const next = new MfDatabase(name);
+    await next.open();
+    expect(next.verno).toBe(2);
+    expect((await next.transactions.toArray()).map((t) => t.id)).toEqual(['keep']);
+    await next.dismissed.put({ key: 'd|a|b', kind: 'duplicate', label: '', dismissedAt: 1 });
+    expect(await next.dismissed.count()).toBe(1);
+    next.close();
+    await Dexie.delete(name);
   });
 });

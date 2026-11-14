@@ -69,3 +69,13 @@ export interface ImportRecord {
 
 /** 明細ID → その明細に当てはまった除外ルールIDの一覧 */
 export type ExclusionMap = Map<string, string[]>;
+
+/** 「二重ではない」と判断された二重計上の候補（次から候補に出さない） */
+export interface DismissedCandidate {
+  /** 引き落とし：'w|口座|内容'、重複購入：'d|明細ID|明細ID' */
+  key: string;
+  kind: 'withdrawal' | 'duplicate';
+  /** 一覧で「もとに戻す」ときの表示名 */
+  label: string;
+  dismissedAt: number;
+}
