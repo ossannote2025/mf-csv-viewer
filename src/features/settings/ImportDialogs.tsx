@@ -62,10 +62,15 @@ export function ImportDialogs() {
         <Stat label="新規の明細" value={formatCount(summary.added)} />
         <Stat label="重複（上書き）" value={formatCount(summary.updated)} />
       </dl>
-      {doubleCount > 0 && (
+      {summary.newDoubleCount > 0 && (
         <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-warn-soft p-3 text-sm text-warn-ink">
           <p className="font-bold">
-            <span aria-hidden="true">⚠ </span>二重計上の候補が<span className="tabular">{doubleCount}</span>件見つかりました
+            <span aria-hidden="true">⚠ </span>二重計上の候補が新しく<span className="tabular">{summary.newDoubleCount}</span>件見つかりました
+            {doubleCount > summary.newDoubleCount && (
+              <span className="block text-xs font-normal">
+                （確認していない候補は全部で<span className="tabular">{doubleCount}</span>件）
+              </span>
+            )}
           </p>
           <button
             type="button"

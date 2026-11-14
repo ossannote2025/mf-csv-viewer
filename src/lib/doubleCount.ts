@@ -35,10 +35,21 @@ const norm = (list: string[]) => list.map(normalizeName);
 // ---------------------------------------------------------------------------
 // キーワード・辞書
 
-/** カードの引き落としらしい言葉（A：候補を拾う） */
-const WITHDRAWAL_WORDS = norm(['カード', 'card', 'クレジット', 'credit', '引落', '引き落とし', 'ひきおとし', 'ヒキオトシ']);
+/**
+ * 引き落としならではの言葉（A：これだけで候補にする）。
+ * 「カード」だけでは候補にしない（「○○カード」という商品名などの買い物があるため）
+ */
+const WITHDRAWAL_WORDS = norm(['引落', '引き落とし', 'ひきおとし', 'ヒキオトシ', '口座振替', '利用代金', 'クレジット', 'credit']);
+/** 「カード」を表す言葉（カードの名前と結び付いたときだけ手がかりにする） */
+const CARD_WORDS = norm(['カード', 'card']);
 /** 引き落としではないもの（ローン返済・デビットなど） */
 const NOT_WITHDRAWAL_WORDS = norm(['デビット', 'debit', 'ローン', 'loan', 'キャッシング', '年会費']);
+
+/** 金融機関名が銀行らしい言葉（引き落とし口座はこれらに限る） */
+const BANK_INSTITUTION_WORDS = norm([
+  '銀行', 'ぎんこう', 'ギンコウ', '信用金庫', '信金', '信用組合', '信組', '労働金庫', '労金', 'ろうきん', 'ゆうちょ', 'ユウチョ',
+  'jaバンク', '農協', '農業協同組合', 'bank',
+]);
 
 /** 金融機関名がカードらしい言葉 */
 const CARD_INSTITUTION_WORDS = norm([
@@ -92,12 +103,17 @@ export function isCardInstitution(institution: string): boolean {
   return includesAny(normalizeName(institution), CARD_INSTITUTION_WORDS);
 }
 
+/** 金融機関名が銀行らしいか（電子マネー・通販サイト・QR 決済などは false） */
+export function isBankInstitution(institution: string): boolean {
+  return includesAny(normalizeName(institution), BANK_INSTITUTION_WORDS);
+}
+
 /** 金融機関名や内容が通販サイトらしいか */
 export function isEcommerceText(s: string): boolean {
   return includesAny(normalizeName(s), EC_WORDS);
 }
 
-/** 内容がカードの引き落としらしい言葉を含むか（A） */
+/** 内容が引き落としならではの言葉を含むか（A）。「カード」だけでは false */
 export function looksLikeWithdrawal(content: string): boolean {
   const n = normalizeName(content);
   return includesAny(n, WITHDRAWAL_WORDS) && !includesAny(n, NOT_WITHDRAWAL_WORDS);
@@ -127,6 +143,13 @@ function cardByName(content: string, cards: CardInfo[]): CardInfo | undefined {
   const byToken = cards.filter((c) => c.tokens.some((t) => n.includes(t)));
   if (byToken.length === 1) return byToken[0];
   return undefined;
+}
+
+/** 内容に「カードの名前＋カード」（例：ミドリカード、ﾗｸﾃﾝｶｰﾄﾞ）が続けて書かれているか */
+function hasCardNamePhrase(content: string, card: CardInfo): boolean {
+  const n = normalizeName(content);
+  const names = [...card.tokens, ...(CARD_COMPANIES.find((c) => c.name === card.company)?.aliases ?? [])];
+  return names.some((name) => CARD_WORDS.some((w) => n.includes(name + w)));
 }
 
 // ---------------------------------------------------------------------------
@@ -273,12 +296,13 @@ const eligible = (t: Transaction, excluded: ExclusionMap) => t.amount < 0 && !t.
 
 export function findWithdrawals(transactions: Transaction[], excluded: ExclusionMap, dismissed: Set<string>): WithdrawalGroup[] {
   const cards = buildCards(transactions);
-  if (cards.length === 0 && !transactions.some((t) => t.amount < 0 && looksLikeWithdrawal(t.content))) return [];
+  if (cards.length === 0 && !transactions.some((t) => t.amount < 0 && isBankInstitution(t.institution) && looksLikeWithdrawal(t.content))) return [];
   const groups = new Map<string, WithdrawalGroup>();
   const nameCache = new Map<string, CardInfo | undefined>();
 
   for (const t of transactions) {
-    if (!eligible(t, excluded) || !t.institution || isCardInstitution(t.institution)) continue;
+    // 引き落とし口座は銀行らしい金融機関に限る（電子マネー・通販サイトなどの買い物を拾わない）
+    if (!eligible(t, excluded) || !isBankInstitution(t.institution) || isCardInstitution(t.institution)) continue;
     if (dismissed.has(withdrawalKey(t.institution, t.content))) continue;
     const keyword = looksLikeWithdrawal(t.content);
     let card = nameCache.get(t.content);
@@ -295,8 +319,8 @@ export function findWithdrawals(transactions: Transaction[], excluded: Exclusion
         amountMatched = true;
       }
     }
-    // キーワードがないものは、名前でカードが分かり、かつ金額も一致したときだけ候補にする
-    if (!keyword && !(card && amountMatched)) continue;
+    // 引き落としならではの言葉がないものは、名前でカードが分かり、かつ「○○カード」と続けて書かれているか、金額が一致したときだけ候補にする
+    if (!keyword && !(card && (amountMatched || hasCardNamePhrase(t.content, card)))) continue;
 
     const gkey = card ? `c|${card.institution}|${t.institution}` : `u|${t.institution}|${t.content}`;
     let g = groups.get(gkey);
@@ -448,4 +472,19 @@ export function dismissDuplicate(p: DuplicatePair, now = Date.now()): DismissedC
     label: `${formatDateFull(p.card.date)} ${p.ec.content || p.ec.institution} ${formatYen(-p.card.amount)}`,
     dismissedAt: now,
   };
+}
+
+/** 候補を1件ずつ表すキーの集まり（引き落としは明細ID、重複購入は組のキー）。取り込み前後の比較に使う */
+export function candidateKeys(r: DoubleCountResult): Set<string> {
+  const keys = new Set<string>();
+  for (const g of r.withdrawals) for (const i of g.items) keys.add(`w|${i.t.id}`);
+  for (const p of r.duplicates) keys.add(p.key);
+  return keys;
+}
+
+/** before になかった候補の件数（取り込みで新しく見つかった候補） */
+export function countNewCandidates(r: DoubleCountResult, before: Set<string>): number {
+  let n = 0;
+  for (const k of candidateKeys(r)) if (!before.has(k)) n++;
+  return n;
 }
