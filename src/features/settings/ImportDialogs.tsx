@@ -3,12 +3,15 @@ import { encodingLabel } from '../../lib/encoding';
 import { formatYm } from '../../lib/date';
 import { formatCount } from '../../lib/format';
 import { useAppStore } from '../../store/useAppStore';
+import { countCandidates } from '../../lib/doubleCount';
 
 /** 取り込み中の進捗表示と、取り込み結果の表示 */
 export function ImportDialogs() {
   const progress = useAppStore((s) => s.importProgress);
   const summary = useAppStore((s) => s.importSummary);
   const close = useAppStore((s) => s.closeImportSummary);
+  const doubleCount = useAppStore((s) => countCandidates(s.doubleCount).total);
+  const openDoubleCount = useAppStore((s) => s.openDoubleCount);
 
   if (progress) {
     const reading = progress.phase === 'read';
@@ -59,6 +62,24 @@ export function ImportDialogs() {
         <Stat label="新規の明細" value={formatCount(summary.added)} />
         <Stat label="重複（上書き）" value={formatCount(summary.updated)} />
       </dl>
+      {doubleCount > 0 && (
+        <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-warn-soft p-3 text-sm text-warn-ink">
+          <p className="font-bold">
+            <span aria-hidden="true">⚠ </span>二重計上の候補が<span className="tabular">{doubleCount}</span>件見つかりました
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              // 取り込み結果を閉じてから、候補の一覧を開く（シートを重ねない）
+              close();
+              openDoubleCount();
+            }}
+            className="min-h-11 shrink-0 rounded-lg bg-accent px-3 font-bold text-on-accent"
+          >
+            確認する
+          </button>
+        </div>
+      )}
       {summary.updated > 0 && (
         <p className="mt-3 text-xs text-muted">同じIDの明細は最新の内容で上書きしたため、二重には計上されません。</p>
       )}

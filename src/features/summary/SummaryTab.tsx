@@ -13,6 +13,8 @@ import { formatYen } from '../../lib/format';
 import { change } from '../../lib/series';
 import { useMonthData } from '../../hooks/useMonthData';
 import { useAppStore } from '../../store/useAppStore';
+import { ChevronRight } from '../../components/Icons';
+import { countCandidates } from '../../lib/doubleCount';
 
 export function SummaryTab() {
   const mode = useAppStore((s) => s.summaryMode);
@@ -34,6 +36,25 @@ export function SummaryTab() {
     >
       {mode === 'month' ? <MonthlyReport /> : <YearReport />}
     </Page>
+  );
+}
+
+/** 表示中の月に二重計上の候補があるときだけ出す1行（タップでその月の候補の一覧を開く） */
+function MonthDoubleCount({ ym }: { ym: string }) {
+  const count = useAppStore((s) => countCandidates(s.doubleCount, ym).total);
+  const open = useAppStore((s) => s.openDoubleCount);
+  if (count === 0) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => open(ym)}
+      className="mx-4 mt-3 flex min-h-12 w-[calc(100%-2rem)] items-center justify-between gap-2 rounded-xl bg-warn-soft px-3 text-left text-sm font-bold text-warn-ink"
+    >
+      <span>
+        <span aria-hidden="true">⚠ </span>この月に二重計上の候補が<span className="tabular">{count}</span>件
+      </span>
+      <ChevronRight className="size-5 shrink-0" />
+    </button>
   );
 }
 
@@ -74,6 +95,8 @@ function MonthlyReport() {
       <div className="mx-4 mt-4">
         <MonthPicker months={months} value={ym} onChange={setSummaryYm} />
       </div>
+
+      <MonthDoubleCount ym={ym} />
 
       <Card>
         <dl className="space-y-3">
