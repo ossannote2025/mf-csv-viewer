@@ -8,6 +8,7 @@ import { ImportDialogs } from './features/settings/ImportDialogs';
 import { SettingsTab } from './features/settings/SettingsTab';
 import { SummaryTab } from './features/summary/SummaryTab';
 import { TransactionsTab } from './features/transactions/TransactionsTab';
+import { MonthlyPrintReport } from './features/report/MonthlyPrintReport';
 import { useAppStore } from './store/useAppStore';
 
 // グラフ（Recharts）は大きいので、グラフタブを開いたときに読み込む
@@ -21,6 +22,7 @@ export default function App() {
   const tab = useAppStore((s) => s.tab);
   const hasData = useAppStore((s) => s.transactions.length > 0);
   const init = useAppStore((s) => s.init);
+  const reportYm = useAppStore((s) => s.reportYm);
 
   useEffect(() => {
     void init();
@@ -60,6 +62,7 @@ export default function App() {
       {content}
       {status === 'ready' && <TabBar />}
       {status === 'ready' && <DoubleCountSheet />}
+      {status === 'ready' && hasData && reportYm && <MonthlyPrintReport ym={reportYm} />}
       <ImportDialogs />
       <UpdateBanner />
     </>

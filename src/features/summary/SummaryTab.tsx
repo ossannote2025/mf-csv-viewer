@@ -63,6 +63,7 @@ function MonthlyReport() {
   const excluded = useAppStore((s) => s.excluded);
   const setSummaryYm = useAppStore((s) => s.setSummaryYm);
   const showTransactions = useAppStore((s) => s.showTransactions);
+  const openReport = useAppStore((s) => s.openReport);
   const oldestYm = transactions[transactions.length - 1]?.ym ?? '';
 
   const calc = useMemo(() => {
@@ -120,6 +121,9 @@ function MonthlyReport() {
         </p>
         <button type="button" onClick={() => showTransactions(monthRange(ym))} className="mt-3 h-11 w-full rounded-xl bg-bg text-sm font-medium text-accent">
           この月の明細を見る
+        </button>
+        <button type="button" onClick={() => openReport(ym)} className="mt-2 h-11 w-full rounded-xl bg-bg text-sm font-medium text-accent">
+          支出レポートを印刷・PDF保存
         </button>
       </Card>
 
