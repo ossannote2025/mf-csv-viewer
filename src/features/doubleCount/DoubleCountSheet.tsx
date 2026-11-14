@@ -99,7 +99,7 @@ function DoubleCountSheetBody({ ym }: { ym?: string }) {
                 <DuplicateCard
                   key={p.key}
                   p={p}
-                  onExclude={() => askExclude('カード側の明細を除外', [duplicateRule(p)])}
+                  onExclude={(side) => askExclude(p.kind === 'ec' ? 'カード側の明細を除外' : 'この明細を除外', [duplicateRule(p, side)])}
                   onDismiss={() => dismissCandidates([dismissDuplicate(p)])}
                 />
               ))
@@ -220,29 +220,48 @@ function WithdrawalCard({ g, ym, onExclude, onDismiss }: { g: WithdrawalGroup; y
   );
 }
 
-function DuplicateCard({ p, onExclude, onDismiss }: { p: DuplicatePair; onExclude: () => void; onDismiss: () => void }) {
+function DuplicateCard({ p, onExclude, onDismiss }: { p: DuplicatePair; onExclude: (side: 'a' | 'b') => void; onDismiss: () => void }) {
+  const ec = p.kind === 'ec';
   const rows = [
-    { tag: '通販', t: p.ec },
-    { tag: 'カード側', t: p.card },
+    { side: 'a' as const, tag: ec ? '通販' : undefined, t: p.a },
+    { side: 'b' as const, tag: ec ? 'カード側' : undefined, t: p.b },
   ];
   return (
     <section className="rounded-xl border border-line p-3">
-      <ul className="space-y-2">
-        {rows.map(({ tag, t }) => (
-          <li key={t.id} className="flex items-start justify-between gap-2 text-sm">
-            <div className="min-w-0">
-              <p className="flex items-center gap-2">
-                <span className="shrink-0 rounded bg-badge px-1.5 text-[11px] text-badge-ink">{tag}</span>
-                <span className="tabular text-muted">{formatDateFull(t.date)}</span>
-              </p>
-              <p className="mt-0.5 font-medium break-all">{t.content || '（内容なし）'}</p>
-              <p className="text-xs break-all text-muted">{t.institution}</p>
+      {!ec && <p className="mb-2 text-xs text-muted">内容が似ている組です。除外する明細を選んでください。</p>}
+      <ul className={ec ? 'space-y-2' : 'divide-y divide-line'}>
+        {rows.map(({ side, tag, t }) => (
+          <li key={t.id} className={`text-sm ${ec ? '' : 'py-2 first:pt-0'}`}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="flex items-center gap-2">
+                  {tag && <span className="shrink-0 rounded bg-badge px-1.5 text-[11px] text-badge-ink">{tag}</span>}
+                  <span className="tabular text-muted">{formatDateFull(t.date)}</span>
+                </p>
+                <p className="mt-0.5 font-medium break-all">{t.content || '（内容なし）'}</p>
+                <p className="text-xs break-all text-muted">{t.institution}</p>
+              </div>
+              <Amount value={t.amount} className="pt-5" />
             </div>
-            <Amount value={t.amount} className="pt-5" />
+            {!ec && (
+              <button
+                type="button"
+                onClick={() => onExclude(side)}
+                className="mt-2 min-h-11 w-full rounded-lg border border-accent px-2 text-sm font-bold text-accent"
+              >
+                こちらを除外
+              </button>
+            )}
           </li>
         ))}
       </ul>
-      <ActionButtons excludeLabel="カード側を除外" onExclude={onExclude} onDismiss={onDismiss} />
+      {ec ? (
+        <ActionButtons excludeLabel="カード側を除外" onExclude={() => onExclude('b')} onDismiss={onDismiss} />
+      ) : (
+        <button type="button" onClick={onDismiss} className="mt-3 min-h-11 w-full rounded-lg border border-line px-2 text-sm font-medium">
+          二重ではない
+        </button>
+      )}
     </section>
   );
 }

@@ -267,10 +267,13 @@ export interface WithdrawalGroup {
 
 export interface DuplicatePair {
   key: string;
-  /** 通販側 */
-  ec: Transaction;
-  /** カード側（除外する側） */
-  card: Transaction;
+  /**
+   * ec：片方が通販サイト（a が通販側、b がカード側。除外するのは b）
+   * similar：内容がよく似ている（どちらを除外するかはユーザーが選ぶ。a が新しい日付）
+   */
+  kind: 'ec' | 'similar';
+  a: Transaction;
+  b: Transaction;
 }
 
 export interface DoubleCountResult {
@@ -361,7 +364,56 @@ function ecSide(a: Transaction, b: Transaction): { ec: Transaction; card: Transa
   return undefined;
 }
 
-/** 金額が同じ・日付が3日以内・金融機関が異なり、片方が通販サイトの支出の組。1つの明細は1組にだけ入れる（日付の近い組を優先） */
+/** 内容が似ているかを見るときに取り除く、よくある言葉（これだけが共通でも似ているとみなさない） */
+const COMMON_WORDS = norm([
+  '株式会社', 'カブシキガイシャ', 'スーパー', 'マーケット', 'ストアー', 'ストア', 'コンビニ', 'ドラッグ', 'ショップ', 'サービス',
+  'クレジット', 'カード', 'オンライン', 'ネット', 'ショッピング', 'デパート', 'センター', 'モール', '支払', 'ご利用', '利用',
+]).sort((a, b) => b.length - a.length);
+
+/** 似ているとみなす、共通する部分の長さ（文字数） */
+export const SIMILAR_MIN_LENGTH = 4;
+
+const similarCache = new Map<string, string>();
+function similarText(content: string): string {
+  let n = similarCache.get(content);
+  if (n === undefined) {
+    n = normalizeName(content);
+    for (const w of COMMON_WORDS) n = n.split(w).join('|');
+    n = n.replace(/[0-9]+/g, '|');
+    if (similarCache.size > 50000) similarCache.clear();
+    similarCache.set(content, n);
+  }
+  return n;
+}
+
+/** 2つの文字列に共通する、いちばん長い部分の長さ（区切り「|」はまたがない） */
+function longestCommonLength(x: string, y: string): number {
+  if (!x || !y) return 0;
+  let best = 0;
+  let prev = new Array<number>(y.length + 1).fill(0);
+  for (let i = 1; i <= x.length; i++) {
+    const cur = new Array<number>(y.length + 1).fill(0);
+    for (let j = 1; j <= y.length; j++) {
+      if (x[i - 1] === y[j - 1] && x[i - 1] !== '|') {
+        cur[j] = prev[j - 1] + 1;
+        if (cur[j] > best) best = cur[j];
+      }
+    }
+    prev = cur;
+  }
+  return best;
+}
+
+/** 内容がよく似ているか（よくある言葉・数字を除いて、4文字以上の共通部分がある） */
+export function contentsAreSimilar(a: string, b: string): boolean {
+  return longestCommonLength(similarText(a), similarText(b)) >= SIMILAR_MIN_LENGTH;
+}
+
+/**
+ * 金額が同じ・日付が3日以内・金融機関が異なる支出の組のうち、
+ * 片方が通販サイトのもの（ec）か、内容がよく似ているもの（similar）。
+ * 1つの明細は1組にだけ入れる（日付の近い組を優先）
+ */
 export function findDuplicates(transactions: Transaction[], excluded: ExclusionMap, dismissed: Set<string>, maxDays = 3): DuplicatePair[] {
   const byAmount = new Map<number, Transaction[]>();
   for (const t of transactions) {
@@ -371,7 +423,7 @@ export function findDuplicates(transactions: Transaction[], excluded: ExclusionM
     else byAmount.set(t.amount, [t]);
   }
 
-  const found: { diff: number; ec: Transaction; card: Transaction }[] = [];
+  const found: { diff: number; kind: DuplicatePair['kind']; a: Transaction; b: Transaction }[] = [];
   for (const list of byAmount.values()) {
     if (list.length < 2) continue;
     const sorted = list.map((t) => ({ t, d: dayNumber(t.date) })).sort((a, b) => a.d - b.d);
@@ -380,24 +432,28 @@ export function findDuplicates(transactions: Transaction[], excluded: ExclusionM
         const a = sorted[i].t;
         const b = sorted[j].t;
         if (a.institution === b.institution) continue;
+        if (dismissed.has(duplicateKey(a.id, b.id))) continue;
+        const diff = sorted[j].d - sorted[i].d;
         const side = ecSide(a, b);
-        if (!side || dismissed.has(duplicateKey(a.id, b.id))) continue;
-        found.push({ diff: sorted[j].d - sorted[i].d, ...side });
+        if (side) found.push({ diff, kind: 'ec', a: side.ec, b: side.card });
+        // a が b 以前の日付なので、新しい b を先に置く
+        else if (contentsAreSimilar(a.content, b.content)) found.push({ diff, kind: 'similar', a: b, b: a });
       }
     }
   }
 
-  found.sort((x, y) => x.diff - y.diff || (x.card.date < y.card.date ? 1 : -1));
+  found.sort((x, y) => x.diff - y.diff || (x.b.date < y.b.date ? 1 : -1));
   const used = new Set<string>();
   const pairs: DuplicatePair[] = [];
   for (const f of found) {
-    if (used.has(f.ec.id) || used.has(f.card.id)) continue;
-    used.add(f.ec.id);
-    used.add(f.card.id);
-    pairs.push({ key: duplicateKey(f.ec.id, f.card.id), ec: f.ec, card: f.card });
+    if (used.has(f.a.id) || used.has(f.b.id)) continue;
+    used.add(f.a.id);
+    used.add(f.b.id);
+    pairs.push({ key: duplicateKey(f.a.id, f.b.id), kind: f.kind, a: f.a, b: f.b });
   }
   // 新しい順
-  return pairs.sort((a, b) => (a.card.date < b.card.date ? 1 : a.card.date > b.card.date ? -1 : a.key.localeCompare(b.key)));
+  const latest = (p: DuplicatePair) => (p.a.date > p.b.date ? p.a.date : p.b.date);
+  return pairs.sort((x, y) => (latest(x) < latest(y) ? 1 : latest(x) > latest(y) ? -1 : x.key.localeCompare(y.key)));
 }
 
 // ---------------------------------------------------------------------------
@@ -414,7 +470,7 @@ export function findDoubleCounts(transactions: Transaction[], excluded: Exclusio
 /** 候補の件数（引き落としは明細の件数、重複購入は組の数）。ym を渡すとその月だけ */
 export function countCandidates(r: DoubleCountResult, ym?: string): { withdrawals: number; duplicates: number; total: number } {
   const w = r.withdrawals.reduce((s, g) => s + (ym ? g.items.filter((i) => i.t.ym === ym).length : g.items.length), 0);
-  const d = ym ? r.duplicates.filter((p) => p.ec.ym === ym || p.card.ym === ym).length : r.duplicates.length;
+  const d = ym ? r.duplicates.filter((p) => p.a.ym === ym || p.b.ym === ym).length : r.duplicates.length;
   return { withdrawals: w, duplicates: d, total: w + d };
 }
 
@@ -422,7 +478,7 @@ export function countCandidates(r: DoubleCountResult, ym?: string): { withdrawal
 export function filterByMonth(r: DoubleCountResult, ym: string): DoubleCountResult {
   return {
     withdrawals: r.withdrawals.filter((g) => g.items.some((i) => i.t.ym === ym)),
-    duplicates: r.duplicates.filter((p) => p.ec.ym === ym || p.card.ym === ym),
+    duplicates: r.duplicates.filter((p) => p.a.ym === ym || p.b.ym === ym),
   };
 }
 
@@ -443,9 +499,9 @@ export function withdrawalRules(g: WithdrawalGroup): { name: string; cond: RuleC
   }));
 }
 
-/** 重複購入のカード側だけに当たるルール */
-export function duplicateRule(p: DuplicatePair): { name: string; cond: RuleConditions } {
-  const t = p.card;
+/** 重複購入の片方だけに当たるルール（既定は b：通販の組ではカード側） */
+export function duplicateRule(p: DuplicatePair, side: 'a' | 'b' = 'b'): { name: string; cond: RuleConditions } {
+  const t = p[side];
   const abs = -t.amount;
   const cond: RuleConditions = {
     institutions: [t.institution],
@@ -469,7 +525,7 @@ export function dismissDuplicate(p: DuplicatePair, now = Date.now()): DismissedC
   return {
     key: p.key,
     kind: 'duplicate',
-    label: `${formatDateFull(p.card.date)} ${p.ec.content || p.ec.institution} ${formatYen(-p.card.amount)}`,
+    label: `${formatDateFull(p.a.date)} ${p.a.content || p.a.institution} ${formatYen(-p.a.amount)}`,
     dismissedAt: now,
   };
 }

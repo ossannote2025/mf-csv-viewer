@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   candidateKeys,
+  contentsAreSimilar,
   countCandidates,
   countNewCandidates,
   dismissDuplicate,
@@ -230,8 +231,9 @@ describe('重複購入', () => {
     const b = tx({ date: '2025-11-05', amount: -3980, institution: CARD, content: 'カクウツウハン' });
     const p = findDuplicates([a, b], none, noKeys);
     expect(p).toHaveLength(1);
-    expect(p[0].ec.id).toBe(a.id);
-    expect(p[0].card.id).toBe(b.id);
+    expect(p[0].kind).toBe('ec');
+    expect(p[0].a.id).toBe(a.id);
+    expect(p[0].b.id).toBe(b.id);
   });
 
   it('4日以上離れている・同じ金融機関・金額が違う・どちらも通販でない組は候補にしない', () => {
@@ -251,10 +253,10 @@ describe('重複購入', () => {
   it('金融機関が通販でなくても、内容が通販なら通販側とする（両方とも通販なら候補にしない）', () => {
     const a = tx({ date: '2025-11-03', amount: -500, institution: 'ポケット架空マネー', content: 'AMAZON.CO.JP' });
     const b = tx({ date: '2025-11-03', amount: -500, institution: CARD, content: '架空ストア' });
-    expect(findDuplicates([a, b], none, noKeys)[0].card.id).toBe(b.id);
+    expect(findDuplicates([a, b], none, noKeys)[0].b.id).toBe(b.id);
     const c = tx({ date: '2025-11-03', amount: -700, institution: 'Amazon.co.jp', content: '架空本' });
     const d = tx({ date: '2025-11-03', amount: -700, institution: CARD, content: 'AMAZON.CO.JP' });
-    expect(findDuplicates([c, d], none, noKeys)[0].card.id).toBe(d.id);
+    expect(findDuplicates([c, d], none, noKeys)[0].b.id).toBe(d.id);
   });
 
   it('1つの明細は日付の近い1組にだけ入れる', () => {
@@ -263,10 +265,10 @@ describe('重複購入', () => {
     const c2 = tx({ date: '2025-11-01', amount: -800, institution: 'そよかぜ架空カード', content: 'c' });
     const p = findDuplicates([e1, c1, c2], none, noKeys);
     expect(p).toHaveLength(1);
-    expect(p[0].card.id).toBe(c2.id);
+    expect(p[0].b.id).toBe(c2.id);
     // その組を「二重ではない」にすると、もう一方の組が出る
     const d = dismissDuplicate(p[0]);
-    expect(findDuplicates([e1, c1, c2], none, new Set([d.key]))[0].card.id).toBe(c1.id);
+    expect(findDuplicates([e1, c1, c2], none, new Set([d.key]))[0].b.id).toBe(c1.id);
   });
 
   it('振替・除外済みは候補にしない', () => {
@@ -286,6 +288,57 @@ describe('重複購入', () => {
     expect(spec.name).toBe('重複：2025/11/5 カクウツウハン ¥3,980');
     const rule: ExclusionRule = { id: 'r', name: spec.name, enabled: true, order: 10, cond: spec.cond, createdAt: 0, updatedAt: 0 };
     expect([a, b, other].filter((t) => matchesRule(rule, t)).map((t) => t.id)).toEqual([b.id]);
+  });
+});
+
+describe('重複購入：内容がよく似ている組', () => {
+  const EMONEY = 'ポケット架空マネー';
+  const WALLET = 'その他架空現金';
+  it('よくある言葉・数字を除いて、4文字以上の共通部分があれば似ているとみなす', () => {
+    expect(contentsAreSimilar('ﾐﾓｻﾞｺｰﾋｰﾌｧｰﾑ 架空駅前店', 'ミモザ 架空駅前店')).toBe(true);
+    expect(contentsAreSimilar('ミモザ珈琲', 'ミモザ')).toBe(false);
+    expect(contentsAreSimilar('まるまるスーパー', 'ヨツバスーパー')).toBe(false);
+    expect(contentsAreSimilar('架空店 12345', '別の店 12345')).toBe(false);
+    expect(contentsAreSimilar('株式会社カクウ', 'カブシキガイシャ カクウ')).toBe(false);
+  });
+
+  it('電子マネーと手入力の財布に同じ買い物が入った組を見つける（新しい日付が a）', () => {
+    const e = tx({ date: '2025-11-17', amount: -1252, institution: EMONEY, content: 'ミモザコーヒーファーム 架空駅前店' });
+    const w = tx({ date: '2025-11-16', amount: -1252, institution: WALLET, content: 'ミモザ 架空駅前店' });
+    const p = findDuplicates([w, e], none, noKeys);
+    expect(p).toHaveLength(1);
+    expect(p[0].kind).toBe('similar');
+    expect(p[0].a.id).toBe(e.id);
+    expect(p[0].b.id).toBe(w.id);
+  });
+
+  it('内容が似ていない・同じ金融機関・金額が違う・4日以上離れている組は候補にしない', () => {
+    const ts = [
+      tx({ date: '2025-11-01', amount: -500, institution: EMONEY, content: '架空ベーカリー' }),
+      tx({ date: '2025-11-01', amount: -500, institution: WALLET, content: '自動販売機' }),
+      tx({ date: '2025-11-02', amount: -700, institution: EMONEY, content: 'ミモザ 架空駅前店' }),
+      tx({ date: '2025-11-02', amount: -700, institution: EMONEY, content: 'ミモザ 架空駅前店' }),
+      tx({ date: '2025-11-03', amount: -800, institution: EMONEY, content: 'ミモザ 架空駅前店' }),
+      tx({ date: '2025-11-03', amount: -801, institution: WALLET, content: 'ミモザ 架空駅前店' }),
+      tx({ date: '2025-11-10', amount: -900, institution: EMONEY, content: 'ミモザ 架空駅前店' }),
+      tx({ date: '2025-11-14', amount: -900, institution: WALLET, content: 'ミモザ 架空駅前店' }),
+    ];
+    expect(findDuplicates(ts, none, noKeys)).toEqual([]);
+  });
+
+  it('通販の組を優先し、どちらの明細を除外するかを選べる', () => {
+    const ec = tx({ date: '2025-11-03', amount: -2000, institution: '架空通販モール', content: 'ミモザの豆' });
+    const card = tx({ date: '2025-11-03', amount: -2000, institution: CARD, content: 'ミモザの豆' });
+    expect(findDuplicates([ec, card], none, noKeys)[0].kind).toBe('ec');
+
+    const e = tx({ date: '2025-11-17', amount: -1252, institution: EMONEY, content: 'ミモザコーヒーファーム' });
+    const w = tx({ date: '2025-11-17', amount: -1252, institution: WALLET, content: 'ミモザコーヒー' });
+    const [p] = findDuplicates([e, w], none, noKeys);
+    const toRule = (side: 'a' | 'b'): ExclusionRule => ({ id: side, name: '', enabled: true, order: 10, cond: duplicateRule(p, side).cond, createdAt: 0, updatedAt: 0 });
+    expect([e, w].filter((t) => matchesRule(toRule('a'), t)).map((t) => t.id)).toEqual([p.a.id]);
+    expect([e, w].filter((t) => matchesRule(toRule('b'), t)).map((t) => t.id)).toEqual([p.b.id]);
+    // 「二重ではない」で出なくなる
+    expect(findDuplicates([e, w], none, new Set([dismissDuplicate(p).key]))).toEqual([]);
   });
 });
 
@@ -350,7 +403,7 @@ describe('速さ', () => {
 });
 
 describe('sample/ の架空データ', () => {
-  it('振替になっていない引き落とし2種類と、通販とカードの重複1組を見つける', async () => {
+  it('振替になっていない引き落とし2種類と、重複購入2組（通販・内容が似ている）を見つける', async () => {
     const { readFileSync, readdirSync } = await import('node:fs');
     const { join } = await import('node:path');
     const { importCsvBytes } = await import('./importer');
@@ -367,6 +420,10 @@ describe('sample/ の架空データ', () => {
     // 11月の引き落としは10月のカード利用額と一致する
     expect(r.withdrawals[0].items.find((i) => i.t.ym === '2025-11')!.amountMatched).toBe(true);
     expect(r.withdrawals[1].contents).toEqual(['ｿﾖｶｾﾞｶｰﾄﾞ']);
-    expect(r.duplicates.map((p) => [p.ec.content, p.card.content, p.card.date])).toEqual([['架空ワイヤレスイヤホン', 'カクウツウハンモール', '2025-11-05']]);
+    // 同じ日付の組は a・b の順が決まらないので、内容を並べ替えて比べる
+    expect(r.duplicates.map((p) => [p.kind, ...(p.kind === 'similar' ? [p.a.content, p.b.content].sort() : [p.a.content, p.b.content]), p.b.date])).toEqual([
+      ['similar', 'ミモザ 架空駅前店', 'ミモザコーヒーファーム 架空駅前店', '2025-11-17'],
+      ['ec', '架空ワイヤレスイヤホン', 'カクウツウハンモール', '2025-11-05'],
+    ]);
   });
 });
