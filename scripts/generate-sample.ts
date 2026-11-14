@@ -11,6 +11,7 @@ const CARD = 'みどり架空カード';
 const EMONEY = 'ポケット架空マネー';
 const CARD2 = 'そよかぜ架空カード';
 const EC = '架空通販モール';
+const WALLET = 'その他架空現金';
 
 // 決定的な乱数（毎回同じデータになるように）
 let seed = 20250801;
@@ -98,6 +99,7 @@ function toCsv(y: number, m: number, rows: Row[], padDate: boolean): string {
  * - 振替になっている引き落とし（候補にならない）
  * - 通販とカードの重複（2日差）、4日差・同じ金融機関どうしの組（候補にならない）
  * - 「カード」を含むだけの買い物（候補にならない）
+ * - 電子マネーと手入力の財布に同じ買い物が入った、内容が似ている組（候補）
  */
 function doubleCountRows(y: number, m: number, prevCardTotal: number): Row[] {
   const rows = monthRows(y, m);
@@ -118,6 +120,9 @@ function doubleCountRows(y: number, m: number, prevCardTotal: number): Row[] {
   // 4日差 → 候補にならない
   add({ day: 8, content: '架空ブックカバー', amount: -1198, inst: EC, large: '趣味・娯楽', middle: '本' });
   add({ day: 12, content: 'カクウツウハンモール', amount: -1198, inst: CARD, large: '趣味・娯楽', middle: '本' });
+  // 電子マネーと手入力の財布で内容が似ている組 → 候補（内容が似ている）
+  add({ day: 17, content: 'ミモザコーヒーファーム 架空駅前店', amount: -1252, inst: EMONEY, large: '食費', middle: '食料品' });
+  add({ day: 17, content: 'ミモザ 架空駅前店', amount: -1252, inst: WALLET, large: '食費', middle: '食費' });
   // 同じ金融機関どうし → 候補にならない
   add({ day: 20, content: '架空電池', amount: -548, inst: EC, large: '日用品', middle: '日用品' });
   add({ day: 21, content: '架空電池', amount: -548, inst: EC, large: '日用品', middle: '日用品' });
