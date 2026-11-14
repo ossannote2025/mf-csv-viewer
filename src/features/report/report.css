@@ -1,0 +1,253 @@
+/*
+ * 月次の支出レポート（印刷・PDF用）のスタイル。
+ * アプリ内の表示に加えて「ファイルとして保存（HTML）」で書き出すファイルにもそのまま埋め込むため、
+ * このファイルだけで完結させる（Tailwind や index.css の変数に頼らない）。
+ * レポートは「紙」なので、ダークモードでも白地・黒文字に固定する（色の値はここの変数で定義する）。
+ */
+.mr-paper {
+  --mr-ink: #111111;
+  --mr-muted: #555555;
+  --mr-line: #bbbbbb;
+  --mr-line-soft: #dddddd;
+  --mr-head-bg: #eeeeee;
+  --mr-paper-bg: #ffffff;
+  --mr-bar-track: #eeeeee;
+
+  box-sizing: border-box;
+  background: var(--mr-paper-bg);
+  color: var(--mr-ink);
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Noto Sans CJK JP', 'Yu Gothic UI', 'Meiryo', sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+  color-scheme: light;
+}
+.mr-paper *,
+.mr-paper *::before,
+.mr-paper *::after {
+  box-sizing: border-box;
+}
+
+.mr-paper h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.mr-paper h2 {
+  margin: 0 0 6px;
+  padding-bottom: 3px;
+  border-bottom: 2px solid var(--mr-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+.mr-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  padding-bottom: 6px;
+  border-bottom: 3px double var(--mr-ink);
+}
+.mr-created {
+  color: var(--mr-muted);
+  font-size: 12px;
+}
+.mr-section {
+  margin-top: 18px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.mr-paper .mr-num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.mr-muted {
+  color: var(--mr-muted);
+}
+
+/* 支出合計 */
+.mr-total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+}
+.mr-total-label {
+  font-size: 14px;
+  font-weight: 700;
+}
+.mr-total-value {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+/* 表 */
+.mr-paper table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.mr-paper th,
+.mr-paper td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--mr-line-soft);
+  vertical-align: top;
+  text-align: left;
+}
+.mr-paper thead th {
+  background: var(--mr-head-bg);
+  border-bottom: 1px solid var(--mr-line);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.mr-paper tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.mr-sumrow th,
+.mr-sumrow td {
+  border-top: 2px solid var(--mr-ink);
+  border-bottom: none;
+  font-weight: 700;
+}
+
+/* カテゴリ別の棒グラフ（表の中に棒を描く） */
+.mr-cat-name {
+  white-space: nowrap;
+}
+.mr-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border: 1px solid rgb(0 0 0 / 0.35);
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+.mr-bar-cell {
+  width: 38%;
+  vertical-align: middle !important;
+}
+.mr-bar-track {
+  height: 10px;
+  background: var(--mr-bar-track);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.mr-bar {
+  height: 100%;
+  min-width: 1px;
+  border-right: 1px solid rgb(0 0 0 / 0.45);
+}
+/* 棒やセルの背景色を印刷でも省かないようにする */
+.mr-paper .mr-bar,
+.mr-paper .mr-bar-track,
+.mr-paper .mr-swatch,
+.mr-paper thead th {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* 明細一覧 */
+.mr-details {
+  margin-top: 24px;
+}
+.mr-details table {
+  font-size: 11px;
+}
+.mr-details td {
+  overflow-wrap: anywhere;
+}
+.mr-col-date {
+  width: 11%;
+  white-space: nowrap;
+}
+.mr-col-amount {
+  width: 13%;
+}
+.mr-col-cat {
+  width: 22%;
+}
+.mr-col-inst {
+  width: 19%;
+}
+.mr-note {
+  margin-top: 6px;
+  color: var(--mr-muted);
+  font-size: 11px;
+}
+.mr-empty {
+  padding: 8px 0;
+  color: var(--mr-muted);
+}
+
+/* 画面で見るとき：紙らしく見せる（幅の狭い iPhone では余白を小さく） */
+@media screen {
+  .mr-paper {
+    max-width: 210mm;
+    margin: 0 auto;
+    padding: 20px 16px 32px;
+  }
+  @media (min-width: 640px) {
+    .mr-paper {
+      padding: 15mm;
+      box-shadow: 0 1px 6px rgb(0 0 0 / 0.25);
+    }
+  }
+}
+
+/* 印刷するとき */
+@page {
+  size: A4 portrait;
+  margin: 15mm;
+  /* ページ番号（対応しているブラウザだけ。Chrome は対応、Safari は表示されない場合がある） */
+  @bottom-center {
+    content: counter(page) ' / ' counter(pages);
+    font-size: 9pt;
+    color: #555555;
+  }
+}
+@media print {
+  html,
+  body {
+    height: auto !important;
+    background: #ffffff !important;
+  }
+  .mr-noprint {
+    display: none !important;
+  }
+  .mr-screen {
+    min-height: 0 !important;
+    background: #ffffff !important;
+  }
+  .mr-paper {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+    font-size: 10.5pt;
+  }
+  .mr-paper h1 {
+    font-size: 18pt;
+  }
+  .mr-total-value {
+    font-size: 20pt;
+  }
+  /* 明細一覧は2ページ目から */
+  .mr-details {
+    margin-top: 0;
+    break-before: page;
+    page-break-before: always;
+  }
+  .mr-details table {
+    font-size: 9pt;
+  }
+  /* 表のヘッダーを各ページに繰り返す */
+  .mr-paper thead {
+    display: table-header-group;
+  }
+}

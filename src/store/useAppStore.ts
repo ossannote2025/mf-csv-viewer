@@ -56,6 +56,8 @@ interface AppState {
   reportYear?: string;
   /** グラフの期間（既定は直近12か月） */
   chartRange: RangePreset;
+  /** 印刷・PDF用の月次レポートを開いている月（閉じているときは null） */
+  reportYm: string | null;
 
   importProgress: ImportProgress | null;
   /** newDoubleCount：この取り込みで新しく見つかった二重計上の候補の件数 */
@@ -72,6 +74,8 @@ interface AppState {
   setSummaryMode: (m: 'month' | 'year') => void;
   setReportYear: (y: string) => void;
   setChartRange: (r: RangePreset) => void;
+  openReport: (ym: string) => void;
+  closeReport: () => void;
   importFiles: (files: File[]) => Promise<void>;
   closeImportSummary: () => void;
   deleteMonth: (ym: string) => Promise<void>;
@@ -117,6 +121,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   chartView: 'breakdown',
   summaryMode: 'month',
   chartRange: '12m',
+  reportYm: null,
   importProgress: null,
   importSummary: null,
 
@@ -143,6 +148,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSummaryMode: (summaryMode) => set({ summaryMode }),
   setReportYear: (reportYear) => set({ reportYear }),
   setChartRange: (chartRange) => set({ chartRange }),
+  openReport: (reportYm) => set({ reportYm }),
+  closeReport: () => set({ reportYm: null }),
 
   importFiles: async (files) => {
     if (files.length === 0 || get().importProgress) return;
@@ -269,7 +276,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   deleteAll: async () => {
     await repo.deleteAllData();
     const data = await repo.loadAll();
-    set({ meta: {}, imports: [], filter: EMPTY_FILTER, summaryYm: undefined, doubleCountSheet: null, ...withExclusions([], data.rules, []) });
+    set({ meta: {}, imports: [], filter: EMPTY_FILTER, summaryYm: undefined, doubleCountSheet: null, reportYm: null, ...withExclusions([], data.rules, []) });
   },
 
   exportBackup: async () => {
