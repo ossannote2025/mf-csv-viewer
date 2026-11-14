@@ -228,7 +228,7 @@ export function MonthlyPrintReport({ ym }: { ym: string }) {
                     <td className="mr-num">{i + 1}</td>
                     <td className="mr-col-date">{shortDay(r.date)}</td>
                     <td>
-                      <div className="mr-clamp mr-clamp-1">{r.content}</div>
+                      <div className="mr-clamp">{r.content}</div>
                     </td>
                     <td className="mr-col-cat">{r.large}</td>
                     <td className="mr-num">{formatYen(r.amount)}</td>

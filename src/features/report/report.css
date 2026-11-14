@@ -170,18 +170,14 @@
 .mr-details td {
   overflow-wrap: anywhere;
 }
-/* 内容は最大2行まで（長い商品名で1行が高くなり、1ページに入る行数が減るのを防ぐ） */
+/* 内容は1行だけ表示し、はみ出す分は「…」で省略する（長い商品名で1行が高くなり、1ページに入る行数が減るのを防ぐ） */
 .mr-clamp {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow: hidden;
-}
-/* トップ10は1行（1ページ目に収めるため。詳しい内容は明細一覧に載る） */
-.mr-clamp-1 {
   -webkit-line-clamp: 1;
   line-clamp: 1;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 .mr-paper .mr-col-date,
 .mr-paper .mr-col-cat {
