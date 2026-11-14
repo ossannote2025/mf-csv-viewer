@@ -50,7 +50,7 @@ npm run check:data  # 実データらしき CSV / JSON がコミットされて�
 - `src/lib/` … 純粋なロジック（CSV 解析・文字コード判定・重複排除・除外ルール・二重計上の候補（`doubleCount.ts`）・集計・バックアップ・CSV 書き出し・カテゴリ色）。**ロジックを足したら必ずユニットテストを書く**
 - `src/db/` … Dexie のスキーマ（`schema.ts`）と保存処理（`repo.ts`）
 - `src/store/useAppStore.ts` … アプリの状態。全明細をメモリに持ち、絞り込み・集計はメモリ上で行う。除外ルールの判定結果は `excluded`（明細ID→ルールID）
-- `src/features/` … 画面（transactions / charts / summary / settings / onboarding / doubleCount）
+- `src/features/` … 画面（transactions / charts / summary / settings / onboarding / doubleCount / report）
 - グラフタブ（Recharts）は遅延読み込み
 
 ## 守るべき仕様
@@ -65,6 +65,12 @@ npm run check:data  # 実データらしき CSV / JSON がコミットされて�
 - **IndexedDB のスキーマを変えるときは `db.version(n+1)` を追加してマイグレーションを書く**。既存の `version(1)` は変更しない。バックアップ JSON の形式を変えるときは `BACKUP_FORMAT` を上げ、古い形式も読めるようにする
 - iPhone の共有シート（`navigator.share`）はタップ直後に呼ぶ必要がある。共有の前に `await` を挟まない（`src/lib/saveFile.ts`）
 - 取り込みは「全ファイルを解析 → まとめて保存」。Safari の IndexedDB はトランザクションの確定ごとの負担が大きいので、ファイルごとに保存しない
+- 月次の支出レポート（印刷・PDF用。`src/features/report/`、データは `src/lib/monthlyReport.ts`）。家族に見せる用途（0.7.0〜0.7.2 でユーザーと相談して決定）
+  - **支出だけを載せる**。収入の行・収入合計・収支など、収入がわかる・逆算できる情報は出さない。振替・計算対象外は、組み込みルールを OFF にしていても載せない（そのときアプリの集計とずれる旨は画面にだけ出す）。除外ルール（二重計上の「除外する」を含む）の明細も載せない。テスト（`monthlyReport.test.ts`）で確認している
+  - PDF ライブラリは使わず、`window.print()` と印刷用の CSS（`report.css`）。CSS は書き出す HTML ファイル（印刷画面が開かないときの代わり）にも埋め込むので、このファイルだけで完結させる（紙は白地・黒文字に固定）
+  - 1ページ目：支出合計・前月比・前年同月比・カテゴリ別の内訳・トップ10。**トップ10まで1ページ目に収める**。iPhone の Safari は Chrome より表の行が3割ほど高いため、Chrome（Playwright の `page.pdf`）で大項目18種類・長い商品名の最悪ケースでも1ページの7割程度に収まるか確かめる。大項目が12より多い月はカテゴリ別の表をさらに詰める（`mr-dense`）
+  - 2ページ目以降の明細一覧：日付順、**日付・内容・金額・大項目の4列**（支払い元・中項目は不要とユーザーが決定）。内容は1行で、はみ出す分は「…」。内容とメモが1行に収まるときだけメモを灰色で添える（CSS だけで判定）。トップ10の内容も1行
+  - ページ番号は `@page` の余白の箱で入れているが、Safari は使わず、自分で URL・日付・ページ番号を入れる（アプリからは消せない）
 
 ## デザイン
 
