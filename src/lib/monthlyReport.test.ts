@@ -120,6 +120,11 @@ describe('月次の支出レポート：構成', () => {
     expect(r).toMatchObject({ total: 0, count: 0, rows: [], top: [], categories: [] });
   });
 
+  it('明細一覧にメモを持たせる（前後の空白は除く）', () => {
+    const r = buildMonthlyReport(groupByMonth([tx({ id: 'm', memo: ' 架空の旅行用 ' }), tx({ id: 'n' })]), new Map(), '2025-10', '2025-10');
+    expect(r.rows.map((x) => x.memo)).toEqual(['架空の旅行用', '']);
+  });
+
   it('割合の表示', () => {
     expect(formatRatio(0.12345)).toBe('12.3%');
     expect(formatRatio(1)).toBe('100%');

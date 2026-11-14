@@ -6,7 +6,7 @@ import { categoryColor } from '../../lib/categoryColors';
 import { formatYm } from '../../lib/date';
 import { countCandidates } from '../../lib/doubleCount';
 import { formatYen } from '../../lib/format';
-import { buildMonthlyReport, formatJaDate, formatRatio, type ReportRow } from '../../lib/monthlyReport';
+import { buildMonthlyReport, formatJaDate, formatRatio } from '../../lib/monthlyReport';
 import { saveFile } from '../../lib/saveFile';
 import type { Change } from '../../lib/series';
 import { useAppStore } from '../../store/useAppStore';
@@ -29,10 +29,6 @@ function changeLabel(c: Change | null): string {
   const word = c.diff > 0 ? '増' : '減';
   const ratio = c.ratio === null ? '' : `（${c.diff > 0 ? '+' : '-'}${formatRatio(Math.abs(c.ratio))}）`;
   return `${formatYen(Math.abs(c.diff))} ${word}${ratio}`;
-}
-
-function category(r: ReportRow): string {
-  return r.middle && r.middle !== r.large ? `${r.large}／${r.middle}` : r.large;
 }
 
 /** 書き出す HTML ファイル（スクリプトなし・外部の読み込みなしで、このファイルだけで表示できる） */
@@ -153,7 +149,7 @@ export function MonthlyPrintReport({ ym }: { ym: string }) {
             <span className="mr-total-value mr-num">{formatYen(data.total)}</span>
           </div>
           <p className="mr-note">{data.count}件。振替・計算対象外・除外した明細は含みません。</p>
-          <table style={{ marginTop: 8 }}>
+          <table className="mr-compact" style={{ marginTop: 6 }}>
             <thead>
               <tr>
                 <th>比較</th>
@@ -181,7 +177,7 @@ export function MonthlyPrintReport({ ym }: { ym: string }) {
           {data.categories.length === 0 ? (
             <p className="mr-empty">この月の支出はありません。</p>
           ) : (
-            <table>
+            <table className="mr-compact">
               <thead>
                 <tr>
                   <th>大項目</th>
@@ -216,23 +212,25 @@ export function MonthlyPrintReport({ ym }: { ym: string }) {
         {data.top.length > 0 && (
           <section className="mr-section">
             <h2>大きな支出 トップ{data.top.length}</h2>
-            <table>
+            <table className="mr-compact">
               <thead>
                 <tr>
-                  <th className="mr-num">順位</th>
-                  <th>日付</th>
+                  <th className="mr-col-rank mr-num">順位</th>
+                  <th className="mr-col-date">日付</th>
                   <th>内容</th>
-                  <th>大項目</th>
-                  <th className="mr-num">金額</th>
+                  <th className="mr-col-cat">大項目</th>
+                  <th className="mr-col-amount mr-num">金額</th>
                 </tr>
               </thead>
               <tbody>
                 {data.top.map((r, i) => (
                   <tr key={r.id}>
                     <td className="mr-num">{i + 1}</td>
-                    <td style={{ whiteSpace: 'nowrap' }}>{shortDay(r.date)}</td>
-                    <td style={{ overflowWrap: 'anywhere' }}>{r.content}</td>
-                    <td>{r.large}</td>
+                    <td className="mr-col-date">{shortDay(r.date)}</td>
+                    <td>
+                      <div className="mr-clamp">{r.content}</div>
+                    </td>
+                    <td className="mr-col-cat">{r.large}</td>
                     <td className="mr-num">{formatYen(r.amount)}</td>
                   </tr>
                 ))}
@@ -250,24 +248,27 @@ export function MonthlyPrintReport({ ym }: { ym: string }) {
                   <th className="mr-col-date">日付</th>
                   <th>内容</th>
                   <th className="mr-col-amount mr-num">金額</th>
-                  <th className="mr-col-cat">大項目／中項目</th>
-                  <th className="mr-col-inst">支払い元</th>
+                  <th className="mr-col-cat">大項目</th>
                 </tr>
               </thead>
               <tbody>
                 {data.rows.map((r) => (
                   <tr key={r.id}>
                     <td className="mr-col-date">{shortDay(r.date)}</td>
-                    <td>{r.content}</td>
+                    <td className="mr-col-content">
+                      <div className="mr-line">
+                        <span className="mr-line-main">{r.content}</span>
+                        {r.memo && <span className="mr-line-memo">メモ：{r.memo}</span>}
+                      </div>
+                    </td>
                     <td className="mr-num">{formatYen(r.amount)}</td>
-                    <td>{category(r)}</td>
-                    <td>{r.institution}</td>
+                    <td className="mr-col-cat">{r.large}</td>
                   </tr>
                 ))}
                 <tr className="mr-sumrow">
                   <th colSpan={2}>支出合計</th>
                   <td className="mr-num">{formatYen(data.total)}</td>
-                  <td colSpan={2} />
+                  <td />
                 </tr>
               </tbody>
             </table>

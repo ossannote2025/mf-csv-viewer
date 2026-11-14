@@ -159,21 +159,62 @@
 .mr-details table {
   font-size: 11px;
 }
+/* 1ページ目の表と明細一覧は行を詰める（トップ10が2ページ目に送られないよう、明細一覧の行数が増えるよう） */
+.mr-paper .mr-compact th,
+.mr-paper .mr-compact td,
+.mr-details th,
+.mr-details td {
+  padding: 2px 4px;
+  line-height: 1.35;
+}
 .mr-details td {
   overflow-wrap: anywhere;
 }
-.mr-col-date {
-  width: 11%;
+/* 内容は1行だけ表示し、はみ出す分は「…」で省略する（長い商品名で1行が高くなり、1ページに入る行数が減るのを防ぐ） */
+.mr-clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+/*
+ * 明細一覧の内容＋メモ：1行だけ表示する。
+ * 内容とメモが1行に収まればメモも並べ、収まらなければメモは折り返して見えない2行目に回す（表示しない）。
+ * 内容だけでもはみ出すときは「…」で省略する。スクリプトを使わないので、書き出した HTML ファイルでも同じように動く
+ */
+.mr-paper .mr-col-content {
+  width: 100%;
+  max-width: 0;
+}
+.mr-line {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 1em;
+  height: 1.35em;
+  overflow: hidden;
+}
+.mr-line-main {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
-.mr-col-amount {
-  width: 13%;
+.mr-line-memo {
+  flex: none;
+  color: var(--mr-muted);
+  white-space: nowrap;
 }
-.mr-col-cat {
-  width: 22%;
+.mr-paper .mr-col-date,
+.mr-paper .mr-col-cat {
+  width: 1%;
+  white-space: nowrap;
 }
-.mr-col-inst {
-  width: 19%;
+.mr-col-amount,
+.mr-col-rank {
+  width: 1%;
 }
 .mr-note {
   margin-top: 6px;
@@ -235,7 +276,21 @@
     font-size: 18pt;
   }
   .mr-total-value {
-    font-size: 20pt;
+    font-size: 18pt;
+  }
+  /* 1ページ目に、大項目が多い月でもトップ10まで収まるよう間隔を詰める */
+  .mr-section {
+    margin-top: 10px;
+  }
+  .mr-paper h2 {
+    margin-bottom: 4px;
+    font-size: 11pt;
+  }
+  .mr-note {
+    margin-top: 2px;
+  }
+  .mr-compact {
+    font-size: 9.5pt;
   }
   /* 明細一覧は2ページ目から */
   .mr-details {
