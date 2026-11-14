@@ -97,6 +97,7 @@ function toCsv(y: number, m: number, rows: Row[], padDate: boolean): string {
  * - 振替になっていないカード引き落とし：ミドリカード（10月のカード利用額と同額）、半角カナの ｿﾖｶｾﾞｶｰﾄﾞ
  * - 振替になっている引き落とし（候補にならない）
  * - 通販とカードの重複（2日差）、4日差・同じ金融機関どうしの組（候補にならない）
+ * - 「カード」を含むだけの買い物（候補にならない）
  */
 function doubleCountRows(y: number, m: number, prevCardTotal: number): Row[] {
   const rows = monthRows(y, m);
@@ -108,6 +109,9 @@ function doubleCountRows(y: number, m: number, prevCardTotal: number): Row[] {
   add({ day: 12, content: '架空シネマ', amount: -1900, inst: CARD2, large: '趣味・娯楽', middle: '映画・音楽・ゲーム' });
   add({ day: 10, content: 'ｿﾖｶｾﾞｶｰﾄﾞ', amount: -24800, inst: BANK2 });
   add({ day: 15, content: 'ミドリカード 臨時払い', amount: -10000, inst: BANK, transfer: 1 });
+  // 「カード」を含むだけの買い物（銀行・電子マネー）→ 候補にならない
+  add({ day: 6, content: '架空トレカ店 カード', amount: -3300, inst: BANK, large: '趣味・娯楽', middle: '映画・音楽・ゲーム' });
+  add({ day: 9, content: 'マネーカード架空', amount: -1000, inst: EMONEY, large: '日用品', middle: '日用品' });
   // 通販とカードの重複（2日差）→ 候補
   add({ day: 3, content: '架空ワイヤレスイヤホン', amount: -3978, inst: EC, large: '趣味・娯楽', middle: '映画・音楽・ゲーム' });
   add({ day: 5, content: 'カクウツウハンモール', amount: -3978, inst: CARD, large: '趣味・娯楽', middle: '映画・音楽・ゲーム' });

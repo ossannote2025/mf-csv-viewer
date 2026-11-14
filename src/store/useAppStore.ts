@@ -4,7 +4,7 @@ import { EMPTY_FILTER, type TransactionFilter } from '../lib/filter';
 import { importCsvBytes, summarize, type FileImportResult, type ImportSummary } from '../lib/importer';
 import { computeExclusions } from '../lib/rules';
 import type { DismissedCandidate, ExclusionMap, ExclusionRule, ImportRecord, Transaction } from '../lib/types';
-import { EMPTY_DOUBLE_COUNT, findDoubleCounts, type DoubleCountResult } from '../lib/doubleCount';
+import { candidateKeys, countNewCandidates, EMPTY_DOUBLE_COUNT, findDoubleCounts, type DoubleCountResult } from '../lib/doubleCount';
 import * as repo from '../db/repo';
 import type { RangePreset } from '../lib/series';
 import { backupFileName, createBackup, parseBackup } from '../lib/backup';
@@ -58,7 +58,8 @@ interface AppState {
   chartRange: RangePreset;
 
   importProgress: ImportProgress | null;
-  importSummary: (ImportSummary & { timing: ImportTiming }) | null;
+  /** newDoubleCount：この取り込みで新しく見つかった二重計上の候補の件数 */
+  importSummary: (ImportSummary & { timing: ImportTiming; newDoubleCount: number }) | null;
 
   init: () => Promise<void>;
   setTab: (tab: Tab) => void;
@@ -146,6 +147,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   importFiles: async (files) => {
     if (files.length === 0 || get().importProgress) return;
     const t0 = performance.now();
+    // 取り込みの前からあった二重計上の候補（取り込み後に「新しく見つかった件数」を出すため）
+    const candidatesBefore = candidateKeys(get().doubleCount);
     const byId = new Map(get().transactions.map((t) => [t.id, t]));
     /** 今回の取り込みで追加・上書きされる明細（同じIDは後のファイルが優先） */
     const changed = new Map<string, Transaction>();
@@ -206,7 +209,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     const t3 = performance.now();
     set({
       importProgress: null,
-      importSummary: { ...summarize(results), timing: { read: t1 - t0, save: t2 - t1, finish: t3 - t2 } },
+      importSummary: {
+        ...summarize(results),
+        timing: { read: t1 - t0, save: t2 - t1, finish: t3 - t2 },
+        newDoubleCount: countNewCandidates(get().doubleCount, candidatesBefore),
+      },
     });
   },
 

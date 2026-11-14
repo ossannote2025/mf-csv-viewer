@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  candidateKeys,
   countCandidates,
+  countNewCandidates,
   dismissDuplicate,
   dismissWithdrawal,
   duplicateRule,
@@ -10,6 +12,7 @@ import {
   findWithdrawals,
   institutionTokens,
   isCardInstitution,
+  isBankInstitution,
   isEcommerceText,
   looksLikeWithdrawal,
   normalizeName,
@@ -69,11 +72,23 @@ describe('判定の部品', () => {
     expect(isCardInstitution('さくら架空銀行')).toBe(false);
     expect(isCardInstitution('ポケット架空マネー')).toBe(false);
   });
-  it('引き落としらしい内容（ローン・デビットは除く）', () => {
-    expect(looksLikeWithdrawal('ﾗｸﾃﾝｶｰﾄﾞｻｰﾋﾞｽ')).toBe(true);
+  it('引き落としならではの言葉（「カード」だけ・ローン・デビットは除く）', () => {
+    expect(looksLikeWithdrawal('ｶｰﾄﾞﾋｷｵﾄｼ')).toBe(true);
     expect(looksLikeWithdrawal('口座引落 ミツイスミトモ')).toBe(true);
+    expect(looksLikeWithdrawal('口座振替 カクウカード')).toBe(true);
+    expect(looksLikeWithdrawal('ﾗｸﾃﾝｶｰﾄﾞｻｰﾋﾞｽ')).toBe(false);
+    expect(looksLikeWithdrawal('架空トレカ店 カード')).toBe(false);
     expect(looksLikeWithdrawal('ｶｰﾄﾞﾛｰﾝ ﾍﾝｻｲ')).toBe(false);
     expect(looksLikeWithdrawal('家賃 ハナミズキ荘')).toBe(false);
+  });
+  it('銀行らしい金融機関名', () => {
+    expect(isBankInstitution('さくら架空銀行')).toBe(true);
+    expect(isBankInstitution('あおぞら架空信金')).toBe(true);
+    expect(isBankInstitution('架空信用金庫')).toBe(true);
+    expect(isBankInstitution('ゆうちょ銀行')).toBe(true);
+    expect(isBankInstitution('Kakuu Bank')).toBe(true);
+    expect(isBankInstitution('ポケット架空マネー')).toBe(false);
+    expect(isBankInstitution('架空通販モール')).toBe(false);
   });
   it('通販サイトらしい名前', () => {
     expect(isEcommerceText('Amazon.co.jp')).toBe(true);
@@ -126,11 +141,35 @@ describe('カード引き落とし', () => {
   });
 
   it('カードを特定できないものは、内容ごとの別のまとまりにする', () => {
-    const ts = [tx({ date: '2025-10-27', amount: -5000, institution: BANK, content: 'ナゾノカード' })];
+    const ts = [tx({ date: '2025-10-27', amount: -5000, institution: BANK, content: 'ナゾノカード ﾋｷｵﾄｼ' })];
     const g = findWithdrawals(ts, none, noKeys);
     expect(g).toHaveLength(1);
     expect(g[0].card).toBeUndefined();
-    expect(withdrawalRules(g[0])[0].name).toBe('ナゾノカードの引き落とし');
+    expect(withdrawalRules(g[0])[0].name).toBe('ナゾノカード ﾋｷｵﾄｼの引き落とし');
+  });
+
+  it('「カード」を含むだけの買い物や、銀行以外の支出は候補にしない', () => {
+    const ts = [
+      ...cardMonths(),
+      // 銀行からの買い物（カードの名前と結び付かない）
+      tx({ date: '2025-10-03', amount: -3300, institution: BANK, content: '架空トレカ店 カード' }),
+      tx({ date: '2025-10-04', amount: -1000, institution: BANK, content: 'マネーカード架空' }),
+      // 電子マネー・通販サイトの支出（引き落としの言葉があっても対象外）
+      tx({ date: '2025-10-05', amount: -500, institution: 'ポケット架空マネー', content: 'ミドリカード ﾋｷｵﾄｼ' }),
+      tx({ date: '2025-10-06', amount: -800, institution: '架空通販モール', content: 'カードケース' }),
+      // カードの名前と結び付くが、「カード」も金額の一致もない（例：そのカード会社の店での買い物）
+      tx({ date: '2025-10-07', amount: -900, institution: BANK, content: 'ミドリ商店' }),
+    ];
+    expect(findWithdrawals(ts, none, noKeys)).toEqual([]);
+  });
+
+  it('カードの名前と「カード」がそろえば、引き落としの言葉がなくても候補にする', () => {
+    const ts = [
+      tx({ date: '2025-09-10', amount: -1000, institution: '楽天カード', content: 'x' }),
+      tx({ date: '2025-10-27', amount: -12345, institution: '架空銀行', content: 'ﾗｸﾃﾝｶｰﾄﾞｻｰﾋﾞｽ' }),
+      tx({ date: '2025-10-28', amount: -2000, institution: '架空銀行', content: 'ラクテン市場' }),
+    ];
+    expect(findWithdrawals(ts, none, noKeys).flatMap((g) => g.contents)).toEqual(['ﾗｸﾃﾝｶｰﾄﾞｻｰﾋﾞｽ']);
   });
 
   it('キーワードがなくても、名前と金額の両方が合えば候補にする（どちらかだけなら候補にしない）', () => {
@@ -266,6 +305,23 @@ describe('件数と月の絞り込み', () => {
     const oct = filterByMonth(r, '2025-10');
     expect(oct.withdrawals).toHaveLength(1);
     expect(oct.duplicates).toHaveLength(0);
+  });
+});
+
+describe('取り込みで新しく見つかった候補', () => {
+  it('取り込み前になかった候補だけを数える', () => {
+    const before = [...cardMonths(), tx({ date: '2025-10-27', amount: -50000, institution: BANK, content: 'カード引き落とし ミドリカード' })];
+    const r1 = findDoubleCounts(before, none, []);
+    const after = [
+      ...before,
+      tx({ date: '2025-11-27', amount: -30000, institution: BANK, content: 'カード引き落とし ミドリカード' }),
+      tx({ date: '2025-11-03', amount: -3980, institution: '架空通販モール', content: 'a' }),
+      tx({ date: '2025-11-04', amount: -3980, institution: CARD, content: 'b' }),
+    ];
+    const r2 = findDoubleCounts(after, none, []);
+    expect(countCandidates(r2).total).toBe(3);
+    expect(countNewCandidates(r2, candidateKeys(r1))).toBe(2);
+    expect(countNewCandidates(r2, candidateKeys(r2))).toBe(0);
   });
 });
 

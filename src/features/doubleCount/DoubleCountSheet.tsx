@@ -23,6 +23,9 @@ import { useAppStore } from '../../store/useAppStore';
 
 type View = 'withdrawal' | 'duplicate';
 
+/** 一度に表示する候補の数（候補が多くても一覧が重くならないように） */
+const PAGE_SIZE = 30;
+
 /** 二重計上の候補の一覧（設定タブ・集計タブ・取り込み結果から開く） */
 export function DoubleCountSheet() {
   const sheet = useAppStore((s) => s.doubleCountSheet);
@@ -41,7 +44,13 @@ function DoubleCountSheetBody({ ym }: { ym?: string }) {
 
   const result = useMemo(() => (ym ? filterByMonth(all, ym) : all), [all, ym]);
   const counts = countCandidates(all, ym);
-  const [view, setView] = useState<View>(() => (counts.withdrawals === 0 && counts.duplicates > 0 ? 'duplicate' : 'withdrawal'));
+  const [view, setViewState] = useState<View>(() => (counts.withdrawals === 0 && counts.duplicates > 0 ? 'duplicate' : 'withdrawal'));
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  const setView = (v: View) => {
+    setViewState(v);
+    setLimit(PAGE_SIZE);
+  };
+  const shown = view === 'withdrawal' ? result.withdrawals.length : result.duplicates.length;
   const [pending, setPending] = useState<{ title: string; rules: ExclusionRule[] } | null>(null);
   const preview = useMemo(() => (pending ? previewRules(pending.rules, transactions) : null), [pending, transactions]);
 
@@ -73,7 +82,7 @@ function DoubleCountSheetBody({ ym }: { ym?: string }) {
               result.withdrawals.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted">カード引き落としの候補はありません</p>
               ) : (
-                result.withdrawals.map((g) => (
+                result.withdrawals.slice(0, limit).map((g) => (
                   <WithdrawalCard
                     key={g.key}
                     g={g}
@@ -86,7 +95,7 @@ function DoubleCountSheetBody({ ym }: { ym?: string }) {
             ) : result.duplicates.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted">重複購入の候補はありません</p>
             ) : (
-              result.duplicates.map((p) => (
+              result.duplicates.slice(0, limit).map((p) => (
                 <DuplicateCard
                   key={p.key}
                   p={p}
@@ -96,6 +105,15 @@ function DoubleCountSheetBody({ ym }: { ym?: string }) {
               ))
             )}
           </div>
+          {shown > limit && (
+            <button
+              type="button"
+              onClick={() => setLimit((n) => n + PAGE_SIZE)}
+              className="mt-3 h-11 w-full rounded-xl bg-bg text-sm font-medium text-accent"
+            >
+              さらに表示（残り{formatCount(shown - limit)}）
+            </button>
+          )}
         </>
       )}
 
