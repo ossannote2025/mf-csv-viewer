@@ -159,21 +159,29 @@
 .mr-details table {
   font-size: 11px;
 }
+.mr-details th,
+.mr-details td {
+  padding: 2px 4px;
+  line-height: 1.35;
+}
 .mr-details td {
   overflow-wrap: anywhere;
 }
-.mr-col-date {
-  width: 11%;
+/* 内容は最大2行まで（長い商品名で1行が高くなり、1ページに入る行数が減るのを防ぐ） */
+.mr-clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.mr-paper .mr-col-date,
+.mr-paper .mr-col-cat {
+  width: 1%;
   white-space: nowrap;
 }
 .mr-col-amount {
-  width: 13%;
-}
-.mr-col-cat {
-  width: 22%;
-}
-.mr-col-inst {
-  width: 19%;
+  width: 1%;
 }
 .mr-note {
   margin-top: 6px;

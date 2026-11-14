@@ -35,8 +35,6 @@ export interface ReportRow {
   /** 支出額（正の数） */
   amount: number;
   large: string;
-  middle: string;
-  institution: string;
 }
 
 /**
@@ -48,7 +46,7 @@ export function isReportExpense(t: Transaction, excluded: ExclusionMap): boolean
 }
 
 function toRow(t: Transaction): ReportRow {
-  return { id: t.id, date: t.date, content: t.content, amount: -t.amount, large: t.large, middle: t.middle, institution: t.institution };
+  return { id: t.id, date: t.date, content: t.content, amount: -t.amount, large: t.large };
 }
 
 function sumExpense(list: Transaction[], excluded: ExclusionMap): number {

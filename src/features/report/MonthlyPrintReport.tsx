@@ -6,7 +6,7 @@ import { categoryColor } from '../../lib/categoryColors';
 import { formatYm } from '../../lib/date';
 import { countCandidates } from '../../lib/doubleCount';
 import { formatYen } from '../../lib/format';
-import { buildMonthlyReport, formatJaDate, formatRatio, type ReportRow } from '../../lib/monthlyReport';
+import { buildMonthlyReport, formatJaDate, formatRatio } from '../../lib/monthlyReport';
 import { saveFile } from '../../lib/saveFile';
 import type { Change } from '../../lib/series';
 import { useAppStore } from '../../store/useAppStore';
@@ -29,10 +29,6 @@ function changeLabel(c: Change | null): string {
   const word = c.diff > 0 ? '増' : '減';
   const ratio = c.ratio === null ? '' : `（${c.diff > 0 ? '+' : '-'}${formatRatio(Math.abs(c.ratio))}）`;
   return `${formatYen(Math.abs(c.diff))} ${word}${ratio}`;
-}
-
-function category(r: ReportRow): string {
-  return r.middle && r.middle !== r.large ? `${r.large}／${r.middle}` : r.large;
 }
 
 /** 書き出す HTML ファイル（スクリプトなし・外部の読み込みなしで、このファイルだけで表示できる） */
@@ -250,24 +246,24 @@ export function MonthlyPrintReport({ ym }: { ym: string }) {
                   <th className="mr-col-date">日付</th>
                   <th>内容</th>
                   <th className="mr-col-amount mr-num">金額</th>
-                  <th className="mr-col-cat">大項目／中項目</th>
-                  <th className="mr-col-inst">支払い元</th>
+                  <th className="mr-col-cat">大項目</th>
                 </tr>
               </thead>
               <tbody>
                 {data.rows.map((r) => (
                   <tr key={r.id}>
                     <td className="mr-col-date">{shortDay(r.date)}</td>
-                    <td>{r.content}</td>
+                    <td>
+                      <div className="mr-clamp">{r.content}</div>
+                    </td>
                     <td className="mr-num">{formatYen(r.amount)}</td>
-                    <td>{category(r)}</td>
-                    <td>{r.institution}</td>
+                    <td className="mr-col-cat">{r.large}</td>
                   </tr>
                 ))}
                 <tr className="mr-sumrow">
                   <th colSpan={2}>支出合計</th>
                   <td className="mr-num">{formatYen(data.total)}</td>
-                  <td colSpan={2} />
+                  <td />
                 </tr>
               </tbody>
             </table>
