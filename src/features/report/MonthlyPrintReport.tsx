@@ -149,7 +149,7 @@ export function MonthlyPrintReport({ ym }: { ym: string }) {
             <span className="mr-total-value mr-num">{formatYen(data.total)}</span>
           </div>
           <p className="mr-note">{data.count}件。振替・計算対象外・除外した明細は含みません。</p>
-          <table style={{ marginTop: 8 }}>
+          <table className="mr-compact" style={{ marginTop: 6 }}>
             <thead>
               <tr>
                 <th>比較</th>
@@ -177,7 +177,7 @@ export function MonthlyPrintReport({ ym }: { ym: string }) {
           {data.categories.length === 0 ? (
             <p className="mr-empty">この月の支出はありません。</p>
           ) : (
-            <table>
+            <table className="mr-compact">
               <thead>
                 <tr>
                   <th>大項目</th>
@@ -212,23 +212,25 @@ export function MonthlyPrintReport({ ym }: { ym: string }) {
         {data.top.length > 0 && (
           <section className="mr-section">
             <h2>大きな支出 トップ{data.top.length}</h2>
-            <table>
+            <table className="mr-compact">
               <thead>
                 <tr>
-                  <th className="mr-num">順位</th>
-                  <th>日付</th>
+                  <th className="mr-col-rank mr-num">順位</th>
+                  <th className="mr-col-date">日付</th>
                   <th>内容</th>
-                  <th>大項目</th>
-                  <th className="mr-num">金額</th>
+                  <th className="mr-col-cat">大項目</th>
+                  <th className="mr-col-amount mr-num">金額</th>
                 </tr>
               </thead>
               <tbody>
                 {data.top.map((r, i) => (
                   <tr key={r.id}>
                     <td className="mr-num">{i + 1}</td>
-                    <td style={{ whiteSpace: 'nowrap' }}>{shortDay(r.date)}</td>
-                    <td style={{ overflowWrap: 'anywhere' }}>{r.content}</td>
-                    <td>{r.large}</td>
+                    <td className="mr-col-date">{shortDay(r.date)}</td>
+                    <td>
+                      <div className="mr-clamp mr-clamp-1">{r.content}</div>
+                    </td>
+                    <td className="mr-col-cat">{r.large}</td>
                     <td className="mr-num">{formatYen(r.amount)}</td>
                   </tr>
                 ))}
