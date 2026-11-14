@@ -15,6 +15,9 @@ import reportCss from './report.css?raw';
 /** レポートを開いている間は、アプリ本体（#root）を画面からも印刷からも隠す */
 const HIDE_APP_CSS = 'body > #root { display: none !important; }';
 
+/** 大項目がこれより多い月は、1ページ目に収めるためにカテゴリ別の表をさらに詰める */
+const DENSE_CATEGORIES = 12;
+
 /** 'YYYY-MM-DD' → 'M/D（曜）' */
 function shortDay(date: string): string {
   const [y, m, d] = date.split('-').map(Number);
@@ -177,7 +180,7 @@ export function MonthlyPrintReport({ ym }: { ym: string }) {
           {data.categories.length === 0 ? (
             <p className="mr-empty">この月の支出はありません。</p>
           ) : (
-            <table className="mr-compact">
+            <table className={data.categories.length > DENSE_CATEGORIES ? 'mr-compact mr-dense' : 'mr-compact'}>
               <thead>
                 <tr>
                   <th>大項目</th>
