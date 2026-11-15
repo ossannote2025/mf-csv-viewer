@@ -9,6 +9,7 @@ import * as repo from '../db/repo';
 import type { RangePreset } from '../lib/series';
 import { backupFileName, createBackup, parseBackup } from '../lib/backup';
 import { saveFile } from '../lib/saveFile';
+import { countInSpans, findMissing, looksLikeDeletedInSource, type DateSpan } from '../lib/missing';
 
 export type Tab = 'transactions' | 'charts' | 'summary' | 'settings';
 export type ChartView = 'breakdown' | 'trend' | 'category';
@@ -26,6 +27,13 @@ export interface ImportTiming {
   read: number;
   save: number;
   finish: number;
+}
+
+/** 今回の CSV にない明細（マネーフォワード側で削除・統合された可能性がある）。取り込み直後にだけ持つ */
+export interface MissingReview {
+  transactions: Transaction[];
+  /** 最初からチェックを付けておくか（件数が多いときは付けない） */
+  preselect: boolean;
 }
 
 interface AppState {
@@ -60,8 +68,10 @@ interface AppState {
   reportYm: string | null;
 
   importProgress: ImportProgress | null;
-  /** newDoubleCount：この取り込みで新しく見つかった二重計上の候補の件数 */
-  importSummary: (ImportSummary & { timing: ImportTiming; newDoubleCount: number }) | null;
+  /** newDoubleCount：この取り込みで新しく見つかった二重計上の候補の件数。missing：今回の CSV にない明細 */
+  importSummary: (ImportSummary & { timing: ImportTiming; newDoubleCount: number; missing: MissingReview | null }) | null;
+  /** 「CSV にない明細」の一覧を開いているか */
+  missingReview: MissingReview | null;
 
   init: () => Promise<void>;
   setTab: (tab: Tab) => void;
@@ -78,6 +88,10 @@ interface AppState {
   closeReport: () => void;
   importFiles: (files: File[]) => Promise<void>;
   closeImportSummary: () => void;
+  openMissingReview: (review: MissingReview) => void;
+  closeMissingReview: () => void;
+  /** ID を指定して明細を削除する */
+  deleteTransactions: (ids: string[]) => Promise<void>;
   deleteMonth: (ym: string) => Promise<void>;
   saveRule: (rule: ExclusionRule) => Promise<void>;
   deleteRule: (id: string) => Promise<void>;
@@ -124,6 +138,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   reportYm: null,
   importProgress: null,
   importSummary: null,
+  missingReview: null,
 
   init: async () => {
     try {
@@ -214,17 +229,35 @@ export const useAppStore = create<AppState>((set, get) => ({
       }));
     }
     const t3 = performance.now();
+    // 今回の CSV にない明細（保存に失敗したときは調べない）
+    let missing: MissingReview | null = null;
+    if (!saveFailed && changed.size > 0) {
+      const spans = results.filter((r) => r.ok && r.complete && r.span).map((r) => r.span as DateSpan);
+      const stored = get().transactions;
+      const found = findMissing(stored, spans, new Set(changed.keys()));
+      if (found.length > 0) missing = { transactions: found, preselect: looksLikeDeletedInSource(found.length, countInSpans(stored, spans)) };
+    }
     set({
       importProgress: null,
       importSummary: {
         ...summarize(results),
         timing: { read: t1 - t0, save: t2 - t1, finish: t3 - t2 },
         newDoubleCount: countNewCandidates(get().doubleCount, candidatesBefore),
+        missing,
       },
     });
   },
 
   closeImportSummary: () => set({ importSummary: null }),
+  openMissingReview: (missingReview) => set({ missingReview }),
+  closeMissingReview: () => set({ missingReview: null }),
+
+  deleteTransactions: async (ids) => {
+    if (ids.length === 0) return;
+    await repo.deleteTransactions(ids);
+    const gone = new Set(ids);
+    set((s) => withExclusions(s.transactions.filter((t) => !gone.has(t.id)), s.rules, s.dismissed));
+  },
 
   deleteMonth: async (ym) => {
     await repo.deleteMonth(ym);
@@ -276,7 +309,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   deleteAll: async () => {
     await repo.deleteAllData();
     const data = await repo.loadAll();
-    set({ meta: {}, imports: [], filter: EMPTY_FILTER, summaryYm: undefined, doubleCountSheet: null, reportYm: null, ...withExclusions([], data.rules, []) });
+    set({ meta: {}, imports: [], filter: EMPTY_FILTER, summaryYm: undefined, doubleCountSheet: null, missingReview: null, reportYm: null, ...withExclusions([], data.rules, []) });
   },
 
   exportBackup: async () => {
@@ -304,6 +337,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       filter: EMPTY_FILTER,
       summaryYm: undefined,
       doubleCountSheet: null,
+      missingReview: null,
       ...withExclusions(sortByDateDesc(loaded.transactions), loaded.rules, loaded.dismissed),
     });
     return { count: data.transactions.length };

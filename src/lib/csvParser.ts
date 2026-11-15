@@ -16,6 +16,9 @@ const COLUMNS = {
   id: 'ID',
 } as const;
 
+/** このアプリの CSV 書き出し（exportCsv.ts）だけが付ける列 */
+const OWN_EXPORT_COLUMN = '除外ルール';
+
 type ColumnKey = keyof typeof COLUMNS;
 
 const REQUIRED: ColumnKey[] = ['date', 'content', 'amount', 'id'];
@@ -49,6 +52,8 @@ export interface ParseResult {
   transactions: Transaction[];
   /** 読み飛ばした行 */
   rowErrors: RowError[];
+  /** このアプリが書き出した CSV か（「除外ルール」列がある）。絞り込んだ一部だけのことがある */
+  ownExport?: boolean;
 }
 
 function flag(raw: string | undefined, defaultValue: boolean): boolean {
@@ -88,6 +93,8 @@ export function parseMfCsv(text: string, fileName: string, importedAt = Date.now
       `1行目に ${missing.join('・')} の列が見つかりません（1行目の内容: ${found || '空'}）。`;
     return result;
   }
+
+  if (header.includes(normalizeHeader(OWN_EXPORT_COLUMN))) result.ownExport = true;
 
   const get = (row: string[], key: ColumnKey): string | undefined =>
     index[key] >= 0 ? (row[index[key]] ?? '').trim() : undefined;

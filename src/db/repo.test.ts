@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import Dexie from 'dexie';
 import { db, MfDatabase } from './schema';
-import { addDismissed, deleteAllData, deleteMonth, loadAll, removeDismissed, restoreBackup, saveImportBatch, saveImported, saveRules } from './repo';
+import { addDismissed, deleteAllData, deleteMonth, deleteTransactions, loadAll, removeDismissed, restoreBackup, saveImportBatch, saveImported, saveRules } from './repo';
 import { computeExclusions } from '../lib/rules';
 import type { Transaction } from '../lib/types';
 
@@ -30,6 +30,12 @@ describe('repo（IndexedDB）', () => {
     const d = await loadAll();
     expect(d.rules.find((r) => r.id === 'x')).toMatchObject({ enabled: false, cond: {} });
     expect(() => computeExclusions([tx('a', '2025-08-01')], d.rules)).not.toThrow();
+  });
+
+  it('ID を指定して明細を削除できる（ない ID は無視する）', async () => {
+    await saveImported([tx('a', '2025-08-01'), tx('b', '2025-08-02'), tx('c', '2025-09-01')], { fileName: 'f', importedAt: 1, rowCount: 3, added: 3, updated: 0 });
+    await deleteTransactions(['b', 'zzz']);
+    expect((await loadAll()).transactions.map((t) => t.id).sort()).toEqual(['a', 'c']);
   });
 
   it('同じIDは上書き保存され、月単位で削除できる', async () => {

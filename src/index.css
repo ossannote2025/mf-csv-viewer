@@ -19,6 +19,7 @@
   --color-income: #15803d;
   --color-expense: #dc2626;
   --color-danger: #b91c1c;
+  --color-on-danger: #ffffff;
   --color-danger-soft: #fef2f2;
   --color-warn-soft: #fffbeb;
   --color-warn-ink: #92400e;
@@ -51,6 +52,8 @@
     --color-income: #22c55e;
     --color-expense: #f87171;
     --color-danger: #ef4444;
+    /* 明るい赤の上の白文字は 3.76:1 しかないので、ダークでは濃い文字にする */
+    --color-on-danger: #1c0606;
     --color-danger-soft: #3b1414;
     --color-warn-soft: #3a2a0a;
     --color-warn-ink: #fcd34d;

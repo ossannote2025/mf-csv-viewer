@@ -5,6 +5,7 @@ import { UpdateBanner } from './components/UpdateBanner';
 import { Onboarding } from './features/onboarding/Onboarding';
 import { DoubleCountSheet } from './features/doubleCount/DoubleCountSheet';
 import { ImportDialogs } from './features/settings/ImportDialogs';
+import { MissingSheet } from './features/settings/MissingSheet';
 import { SettingsTab } from './features/settings/SettingsTab';
 import { SummaryTab } from './features/summary/SummaryTab';
 import { TransactionsTab } from './features/transactions/TransactionsTab';
@@ -62,6 +63,7 @@ export default function App() {
       {content}
       {status === 'ready' && <TabBar />}
       {status === 'ready' && <DoubleCountSheet />}
+      {status === 'ready' && <MissingSheet />}
       {status === 'ready' && hasData && reportYm && <MonthlyPrintReport ym={reportYm} />}
       <ImportDialogs />
       <UpdateBanner />

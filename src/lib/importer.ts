@@ -1,5 +1,6 @@
 import { decodeCsvBytes, type DetectedEncoding } from './encoding';
 import { parseMfCsv, type RowError } from './csvParser';
+import { spanOf, type DateSpan } from './missing';
 import type { Transaction } from './types';
 
 export interface FileImportResult {
@@ -12,6 +13,13 @@ export interface FileImportResult {
   updated: number;
   rowErrors: RowError[];
   months: string[];
+  /** ファイルの明細の日付の範囲（「CSV にない明細」を探す期間） */
+  span?: DateSpan;
+  /**
+   * このファイルにない明細を「マネーフォワード側で消えた」とみなしてよいか。
+   * このアプリが書き出した CSV（一部だけのことがある）と、読み飛ばした行があるファイルは false
+   */
+  complete?: boolean;
 }
 
 export interface ImportSummary {
@@ -81,6 +89,8 @@ export function importCsvBytes(
       updated,
       rowErrors: parsed.rowErrors,
       months,
+      span: spanOf(parsed.transactions),
+      complete: !parsed.ownExport && parsed.rowErrors.length === 0,
     },
     transactions: parsed.transactions,
   };
