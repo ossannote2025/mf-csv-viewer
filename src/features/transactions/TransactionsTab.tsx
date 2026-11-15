@@ -176,7 +176,7 @@ export function TransactionsTab() {
                 {it.kind === 'day' ? (
                   <div className="flex h-9 items-end justify-between bg-bg px-4 pb-1 text-xs font-bold text-muted">
                     <span>{formatDay(it.date)}</span>
-                    <Amount value={it.sum} className="font-normal" />
+                    <Amount value={it.sum} onBg className="font-normal" />
                   </div>
                 ) : (
                   <TransactionRow

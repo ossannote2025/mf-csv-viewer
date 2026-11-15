@@ -6,7 +6,8 @@
   --color-surface: #ffffff;
   --color-line: #e4e4e7;
   --color-ink: #18181b;
-  --color-muted: #71717a;
+  /* 灰色の背景（bg）や薄い色の背景（accent-soft）の上でも 4.5:1 以上になる濃さ */
+  --color-muted: #69696f;
   /* アクセントは濃紺 */
   --color-accent: #1f3a5f;
   --color-accent-soft: #e3eaf3;

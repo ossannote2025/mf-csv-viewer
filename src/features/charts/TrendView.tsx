@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Bar, CartesianGrid, ComposedChart, Line, ReferenceLine, Tooltip, XAxis, YAxis } from 'recharts';
 import { Amount } from '../../components/Amount';
 import { Card } from '../../components/Page';
-import { formatYm } from '../../lib/date';
+import { formatYm, formatYmShort } from '../../lib/date';
 import { formatYen } from '../../lib/format';
 import { monthlySeries } from '../../lib/series';
 import { useAppStore } from '../../store/useAppStore';
@@ -21,6 +21,8 @@ export function TrendView() {
 
   const sum = data.reduce((a, p) => ({ income: a.income + p.income, expense: a.expense + p.expense }), { income: 0, expense: 0 });
   const n = data.length || 1;
+  // 一覧の表：7桁以上の金額があるか
+  const wide = data.some((p) => Math.max(p.income, p.expense, Math.abs(p.balance)) >= 1_000_000);
 
   return (
     <>
@@ -88,13 +90,15 @@ export function TrendView() {
       </Card>
 
       <Card title="月別の一覧">
-        <table className="tabular w-full text-sm">
+        {/* 金額の桁が多い月でも数字がくっつかないよう、月は短く書き、列の間を空ける。100万円以上の月があるときは文字を小さくして幅 375px に収め、それでも収まらないときは横にスクロールする */}
+        <div className="overflow-x-auto">
+        <table className={`tabular w-full whitespace-nowrap ${wide ? 'text-xs' : 'text-sm'}`}>
           <thead>
             <tr className="text-xs text-muted">
               <th className="py-1 text-left font-normal">月</th>
-              <th className="py-1 text-right font-normal">収入</th>
-              <th className="py-1 text-right font-normal">支出</th>
-              <th className="py-1 text-right font-normal">収支</th>
+              <th className="py-1 pl-2 text-right font-normal">収入</th>
+              <th className="py-1 pl-2 text-right font-normal">支出</th>
+              <th className="py-1 pl-2 text-right font-normal">収支</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
@@ -105,18 +109,19 @@ export function TrendView() {
                   setSummaryYm(p.ym);
                   setTab('summary');
                 }}
-                className="cursor-pointer active:bg-bg"
+                className="h-11 cursor-pointer active:bg-bg"
               >
-                <td className="py-2.5">{formatYm(p.ym)}</td>
-                <td className="py-2.5 text-right">{formatYen(p.income)}</td>
-                <td className="py-2.5 text-right">{formatYen(p.expense)}</td>
-                <td className="py-2.5 text-right">
+                <td className="py-2.5">{formatYmShort(p.ym)}</td>
+                <td className="py-2.5 pl-2 text-right">{formatYen(p.income)}</td>
+                <td className="py-2.5 pl-2 text-right">{formatYen(p.expense)}</td>
+                <td className="py-2.5 pl-2 text-right">
                   <Amount value={p.balance} />
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
         <p className="mt-2 text-xs text-muted">月をタップすると、その月の集計を表示します。</p>
       </Card>
     </>
