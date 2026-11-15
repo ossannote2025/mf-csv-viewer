@@ -65,6 +65,11 @@ export async function deleteMonth(ym: string): Promise<number> {
   return db.transactions.where('ym').equals(ym).delete();
 }
 
+/** ID を指定して明細を削除する（「CSV にない明細」の整理） */
+export async function deleteTransactions(ids: string[]): Promise<void> {
+  await db.transactions.bulkDelete(ids);
+}
+
 export async function saveRule(rule: ExclusionRule): Promise<void> {
   await db.rules.put(rule);
 }

@@ -12,6 +12,7 @@ export function ImportDialogs() {
   const close = useAppStore((s) => s.closeImportSummary);
   const doubleCount = useAppStore((s) => countCandidates(s.doubleCount).total);
   const openDoubleCount = useAppStore((s) => s.openDoubleCount);
+  const openMissingReview = useAppStore((s) => s.openMissingReview);
 
   if (progress) {
     const reading = progress.phase === 'read';
@@ -78,6 +79,26 @@ export function ImportDialogs() {
               // 取り込み結果を閉じてから、候補の一覧を開く（シートを重ねない）
               close();
               openDoubleCount();
+            }}
+            className="min-h-11 shrink-0 rounded-lg bg-accent px-3 font-bold text-on-accent"
+          >
+            確認する
+          </button>
+        </div>
+      )}
+      {summary.missing && (
+        <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-warn-soft p-3 text-sm text-warn-ink">
+          <p className="font-bold">
+            <span aria-hidden="true">⚠ </span>今回のCSVにない明細が<span className="tabular">{summary.missing.transactions.length}</span>件あります
+            <span className="block text-xs font-normal">マネーフォワードで削除・統合した明細かもしれません（自動では消しません）</span>
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              // 取り込み結果を閉じてから、一覧を開く（シートを重ねない）
+              const review = summary.missing;
+              close();
+              if (review) openMissingReview(review);
             }}
             className="min-h-11 shrink-0 rounded-lg bg-accent px-3 font-bold text-on-accent"
           >
