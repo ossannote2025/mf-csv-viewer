@@ -2,7 +2,8 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import Dexie from 'dexie';
 import { db, MfDatabase } from './schema';
-import { addDismissed, deleteAllData, deleteMonth, deleteTransactions, loadAll, removeDismissed, restoreBackup, saveImportBatch, saveImported, saveRules } from './repo';
+import { addDismissed, deleteAllData, deleteMonth, deleteTransactions, loadAll, loadRaw, resetDatabase, removeDismissed, restoreBackup, saveImportBatch, saveImported, saveRules } from './repo';
+import { createBackup, parseBackup } from '../lib/backup';
 import { computeExclusions } from '../lib/rules';
 import type { Transaction } from '../lib/types';
 
@@ -36,6 +37,69 @@ describe('repo（IndexedDB）', () => {
     await saveImported([tx('a', '2025-08-01'), tx('b', '2025-08-02'), tx('c', '2025-09-01')], { fileName: 'f', importedAt: 1, rowCount: 3, added: 3, updated: 0 });
     await deleteTransactions(['b', 'zzz']);
     expect((await loadAll()).transactions.map((t) => t.id).sort()).toEqual(['a', 'c']);
+  });
+
+  it('救済用の読み出し：集計を通さずにそのまま読み、壊れたルールは OFF にする', async () => {
+    await saveImported([tx('a', '2025-08-01')], { fileName: 'f', importedAt: 7, rowCount: 1, added: 1, updated: 0 });
+    await db.rules.put({ id: 'x', name: '壊れたルール', enabled: true, order: 10, cond: { content: { op: 'equals' } }, createdAt: 0, updatedAt: 0 } as never);
+    await addDismissed([{ key: 'd|a|b', kind: 'duplicate', label: 'x', dismissedAt: 1 }]);
+    const raw = await loadRaw();
+    expect(raw.failed).toEqual([]);
+    expect(raw.transactions.map((t) => t.id)).toEqual(['a']);
+    expect(raw.rules.find((r) => r.id === 'x')).toMatchObject({ enabled: false, cond: {} });
+    expect(raw.rules.filter((r) => r.builtin)).toHaveLength(2);
+    expect(raw.imports).toHaveLength(1);
+    expect(raw.dismissed).toHaveLength(1);
+    expect(raw.meta.lastImportAt).toBe(7);
+    // 書き出したバックアップは、そのまま復元できる
+    const json = JSON.stringify(createBackup(raw.transactions, raw.rules, raw.imports, raw.meta, raw.dismissed, 9));
+    expect(parseBackup(json).transactions).toHaveLength(1);
+  });
+
+  it('形の崩れた明細が保存されていても読み込める（直せるものは整え、直せないものは外す）', async () => {
+    await db.transactions.bulkPut([tx('a', '2025-08-01'), { id: 'b', date: '2025-08-02', amount: -5 }, { id: 'c', date: 'x', amount: -5 }] as never);
+    const d = await loadAll();
+    expect(d.transactions.map((t) => t.id).sort()).toEqual(['a', 'b']);
+    expect(d.transactions.find((t) => t.id === 'b')).toMatchObject({ content: '', ym: '2025-08', isTarget: true });
+    const content = { id: 'r', name: 'r', enabled: true, order: 10, cond: { content: { op: 'contains' as const, value: 'x' } }, createdAt: 0, updatedAt: 0 };
+    expect(() => computeExclusions(d.transactions, [...d.rules, content])).not.toThrow();
+    const raw = await loadRaw();
+    expect(raw.transactions).toHaveLength(2);
+    expect(raw.dropped).toBe(1);
+  });
+
+  it('救済用の読み出し：読めないテーブルがあっても、読めたものだけを返す', async () => {
+    await saveImported([tx('a', '2025-08-01')], { fileName: 'f', importedAt: 7, rowCount: 1, added: 1, updated: 0 });
+    const original = db.rules.toArray.bind(db.rules);
+    db.rules.toArray = (() => Promise.reject(new Error('読めない'))) as never;
+    try {
+      const raw = await loadRaw();
+      expect(raw.failed).toEqual(['除外ルール']);
+      expect(raw.transactions).toHaveLength(1);
+      expect(raw.rules.map((r) => r.builtin)).toEqual(['transfer', 'nonTarget']);
+    } finally {
+      db.rules.toArray = original;
+    }
+  });
+
+  it('救済用の全削除：消したあと、最初の状態で読み込める', async () => {
+    await saveImported([tx('a', '2025-08-01')], { fileName: 'f', importedAt: 7, rowCount: 1, added: 1, updated: 0 });
+    await resetDatabase();
+    const d = await loadAll();
+    expect(d.transactions).toEqual([]);
+    expect(d.rules.map((r) => r.builtin)).toEqual(['transfer', 'nonTarget']);
+  });
+
+  it('救済用の全削除：ふつうの削除ができないときは、データベースごと作り直す', async () => {
+    await saveImported([tx('a', '2025-08-01')], { fileName: 'f', importedAt: 7, rowCount: 1, added: 1, updated: 0 });
+    const original = db.transactions.clear.bind(db.transactions);
+    db.transactions.clear = (() => Promise.reject(new Error('消せない'))) as never;
+    try {
+      await resetDatabase();
+    } finally {
+      db.transactions.clear = original;
+    }
+    expect((await loadAll()).transactions).toEqual([]);
   });
 
   it('同じIDは上書き保存され、月単位で削除できる', async () => {

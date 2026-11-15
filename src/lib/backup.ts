@@ -78,6 +78,50 @@ function checkTransaction(t: unknown, i: number): Transaction {
   };
 }
 
+/**
+ * 保存されていた明細の形を整える。欠けている文字列は空文字に、振替・計算対象の印は既定値にする。
+ * ID・日付・金額が正しくない明細は直せないので null（呼び出し側で捨てる）。
+ * 形の崩れた明細が1件あるだけで、検索や集計が例外になってアプリが開けなくなるのを防ぐ
+ */
+export function repairTransaction(raw: unknown): Transaction | null {
+  if (!isObj(raw)) return null;
+  const t = raw;
+  if (!isStr(t.id) || t.id === '' || !isStr(t.date) || !/^\d{4}-\d{2}-\d{2}$/.test(t.date) || !isNum(t.amount)) return null;
+  const text = (v: unknown) => (isStr(v) ? v : '');
+  const ok =
+    t.ym === t.date.slice(0, 7) &&
+    isStr(t.content) && isStr(t.institution) && isStr(t.large) && isStr(t.middle) && isStr(t.memo) &&
+    isBool(t.isTarget) && isBool(t.isTransfer) && isStr(t.sourceFile) && isNum(t.row) && isNum(t.importedAt);
+  // 正しい形ならそのまま返す（ほとんどの明細はこちら）
+  if (ok) return raw as unknown as Transaction;
+  return {
+    id: t.id,
+    date: t.date,
+    ym: t.date.slice(0, 7),
+    content: text(t.content),
+    amount: t.amount,
+    institution: text(t.institution),
+    large: text(t.large) || '未分類',
+    middle: text(t.middle) || '未分類',
+    memo: text(t.memo),
+    isTarget: isBool(t.isTarget) ? t.isTarget : true,
+    isTransfer: isBool(t.isTransfer) ? t.isTransfer : false,
+    sourceFile: text(t.sourceFile),
+    row: isNum(t.row) ? t.row : 0,
+    importedAt: isNum(t.importedAt) ? t.importedAt : 0,
+  };
+}
+
+/** 明細の一覧を整える。dropped は直せずに捨てた件数 */
+export function repairTransactions(list: unknown[]): { transactions: Transaction[]; dropped: number } {
+  const transactions: Transaction[] = [];
+  for (const raw of list) {
+    const t = repairTransaction(raw);
+    if (t) transactions.push(t);
+  }
+  return { transactions, dropped: list.length - transactions.length };
+}
+
 function checkRule(r: unknown, i: number): ExclusionRule {
   if (!isObj(r) || !isStr(r.id) || !isStr(r.name) || !isBool(r.enabled) || !isObj(r.cond)) {
     throw new BackupError(`除外ルールの${i + 1}件目が正しくありません。`);

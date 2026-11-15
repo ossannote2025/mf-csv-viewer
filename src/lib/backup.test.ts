@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { backupFileName, backupIsStale, BackupError, createBackup, parseBackup } from './backup';
+import { backupFileName, backupIsStale, BackupError, createBackup, parseBackup, repairTransaction, repairTransactions } from './backup';
 import { BUILTIN_RULES } from './rules';
 import type { DismissedCandidate, ExclusionRule, Transaction } from './types';
 
@@ -93,3 +93,33 @@ describe('バックアップ：除外ルールの条件の検証', () => {
     expect(parseBackup(json).rules[0]).toMatchObject({ builtin: 'transfer', enabled: false, cond: {} });
   });
 });
+
+describe('形の崩れた明細を整える', () => {
+  it('正しい形の明細は、同じものをそのまま返す', () => {
+    expect(repairTransaction(tx)).toBe(tx);
+  });
+
+  it('欠けている項目を既定値で補う', () => {
+    const broken = { id: 'B1', date: '2025-08-02', amount: -500, isTransfer: 'yes' };
+    expect(repairTransaction(broken)).toEqual({
+      id: 'B1', date: '2025-08-02', ym: '2025-08', content: '', amount: -500, institution: '', large: '未分類', middle: '未分類',
+      memo: '', isTarget: true, isTransfer: false, sourceFile: '', row: 0, importedAt: 0,
+    });
+    // 年月がずれていたら日付に合わせる
+    expect(repairTransaction({ ...tx, ym: '1999-01' })?.ym).toBe('2025-08');
+  });
+
+  it('ID・日付・金額が正しくない明細は直せないので捨て、件数を返す', () => {
+    const list = [tx, { ...tx, id: '' }, { ...tx, date: '2025/08/01' }, { ...tx, amount: '100' }, { ...tx, amount: Number.NaN }, null, 'x'];
+    const r = repairTransactions(list);
+    expect(r.transactions).toEqual([tx]);
+    expect(r.dropped).toBe(6);
+  });
+
+  it('整えた明細は、バックアップとして書き出して読み戻せる', () => {
+    const repaired = repairTransactions([{ id: 'B1', date: '2025-08-02', amount: -500 }]).transactions;
+    const json = JSON.stringify(createBackup(repaired, [...BUILTIN_RULES], [], {}, [], 1));
+    expect(parseBackup(json).transactions).toEqual(repaired);
+  });
+});
+
