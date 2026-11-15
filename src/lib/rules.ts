@@ -39,6 +39,61 @@ export function isEmptyConditions(c: RuleConditions): boolean {
   );
 }
 
+const isStringArray = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === 'string');
+const isAmount = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+const isDateText = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+/**
+ * 保存されていた・バックアップから読んだ条件が正しい形かを確かめ、知っている項目だけを取り出す。
+ * 形が正しくない項目が1つでもあれば null（一部だけ捨てると、条件がゆるくなって意図しない明細まで除外してしまうため）
+ */
+export function checkConditions(raw: unknown): RuleConditions | null {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
+  const c = raw as Record<string, unknown>;
+  const out: RuleConditions = {};
+  if (c.content != null) {
+    const v = c.content as Record<string, unknown>;
+    if (typeof v !== 'object' || typeof v.value !== 'string') return null;
+    if (v.op !== 'contains' && v.op !== 'equals' && v.op !== 'startsWith') return null;
+    out.content = { op: v.op, value: v.value };
+  }
+  for (const key of ['institutions', 'large', 'middle'] as const) {
+    if (c[key] == null) continue;
+    const v = c[key];
+    if (!isStringArray(v)) return null;
+    out[key] = v;
+  }
+  for (const key of ['amountMin', 'amountMax'] as const) {
+    if (c[key] == null) continue;
+    const v = c[key];
+    if (!isAmount(v)) return null;
+    out[key] = v;
+  }
+  if (c.flow != null) {
+    if (c.flow !== 'income' && c.flow !== 'expense') return null;
+    out.flow = c.flow;
+  }
+  for (const key of ['dateFrom', 'dateTo'] as const) {
+    if (c[key] == null || c[key] === '') continue;
+    const v = c[key];
+    if (!isDateText(v)) return null;
+    out[key] = v;
+  }
+  return out;
+}
+
+/**
+ * 保存されていたルールのうち、条件の形が正しくないものを「OFF・条件なし」にする（何にも当てはまらない）。
+ * 壊れたルールが1つあるだけでアプリが起動しなくなるのを防ぐ。ルール自体は残すので、設定タブで確認・削除できる
+ */
+export function repairRules(rules: ExclusionRule[]): ExclusionRule[] {
+  return rules.map((r) => {
+    if (r.builtin) return r;
+    const cond = checkConditions(r.cond);
+    return cond ? { ...r, cond } : { ...r, enabled: false, cond: {} };
+  });
+}
+
 /** 1つのルールに明細が当てはまるか（条件どうしはAND） */
 export function matchesRule(rule: ExclusionRule, t: Transaction): boolean {
   if (rule.builtin === 'transfer') return t.isTransfer;

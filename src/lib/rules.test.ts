@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BUILTIN_RULES, computeExclusions, ensureBuiltinRules, matchesRule, previewRule, previewRules } from './rules';
+import { BUILTIN_RULES, checkConditions, computeExclusions, ensureBuiltinRules, matchesRule, previewRule, previewRules, repairRules } from './rules';
 import type { ExclusionRule, RuleConditions, Transaction } from './types';
 
 function tx(p: Partial<Transaction>): Transaction {
@@ -87,5 +87,25 @@ describe('previewRule / ensureBuiltinRules', () => {
     const out = ensureBuiltinRules(existing);
     expect(out).toHaveLength(2);
     expect(out[0].enabled).toBe(false);
+  });
+});
+
+describe('壊れた条件のルール', () => {
+  const broken = { id: 'x', name: '壊れたルール', enabled: true, order: 10, cond: { content: { op: 'equals' }, flow: 'expense' }, createdAt: 0, updatedAt: 0 } as unknown as ExclusionRule;
+
+  it('checkConditions は形が正しくなければ null を返す', () => {
+    expect(checkConditions(broken.cond)).toBeNull();
+    expect(checkConditions(null)).toBeNull();
+    expect(checkConditions([])).toBeNull();
+    expect(checkConditions({ large: ['食費'], dateTo: '' })).toEqual({ large: ['食費'] });
+  });
+
+  it('repairRules は壊れたルールを OFF・条件なしにして残し、集計が例外にならない', () => {
+    const ok: ExclusionRule = { id: 'ok', name: 'ok', enabled: true, order: 11, cond: { large: ['食費'] }, createdAt: 0, updatedAt: 0 };
+    const repaired = repairRules([...BUILTIN_RULES, broken, ok]);
+    expect(repaired.find((r) => r.id === 'x')).toMatchObject({ enabled: false, cond: {}, name: '壊れたルール' });
+    expect(repaired.find((r) => r.id === 'ok')).toEqual(ok);
+    expect(repaired.filter((r) => r.builtin)).toEqual(BUILTIN_RULES);
+    expect(() => computeExclusions([], repaired)).not.toThrow();
   });
 });

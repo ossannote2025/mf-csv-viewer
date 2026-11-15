@@ -12,7 +12,7 @@ export interface MonthlyReportData {
   /** 支出合計（正の数） */
   total: number;
   count: number;
-  /** 前月比・前年同月比（支出どうし）。比較する月がデータの期間より前なら null */
+  /** 前月比・前年同月比（支出どうし）。比較する月に明細が1件もなければ null */
   prevMonth: Change | null;
   lastYear: Change | null;
   /** 大項目別（多い順） */
@@ -67,7 +67,11 @@ export function buildMonthlyReport(byMonth: Map<string, Transaction[]>, excluded
   const items = list.filter((t) => isReportExpense(t, excluded));
   const total = items.reduce((s, t) => s + -t.amount, 0);
 
-  const compare = (m: string) => (m < oldestYm ? null : change(total, sumExpense(byMonth.get(m) ?? [], excluded)));
+  // 明細が1件もない月（取り込んでいない月）とは比べない。0円と比べると、支出がまるごと「増」に見えてしまう
+  const compare = (m: string) => {
+    const prev = m < oldestYm ? undefined : byMonth.get(m);
+    return prev?.length ? change(total, sumExpense(prev, excluded)) : null;
+  };
 
   const cats = new Map<string, { name: string; amount: number; count: number }>();
   for (const t of items) {

@@ -130,3 +130,22 @@ describe('月次の支出レポート：構成', () => {
     expect(formatRatio(1)).toBe('100%');
   });
 });
+
+describe('月次の支出レポート：明細のない月との比較', () => {
+  // 9月を取り込んでいない（8月・10月だけある）
+  const list = [tx({ date: '2025-08-05', amount: -30000 }), tx({ date: '2025-10-05', amount: -20000 }), tx({ date: '2024-10-05', amount: -15000 })];
+  const excluded = computeExclusions(list, BUILTIN_RULES);
+
+  it('前月に明細が1件もなければ、0円と比べずに null にする', () => {
+    const r = buildMonthlyReport(groupByMonth(list), excluded, '2025-10', '2024-10');
+    expect(r.prevMonth).toBeNull();
+    expect(r.lastYear).toEqual({ diff: 5000, ratio: 5000 / 15000 });
+  });
+
+  it('前年同月に明細がなければ null、前月に支出がなくても明細があれば 0 円と比べる', () => {
+    const withIncome = [...list, tx({ date: '2025-09-25', amount: 300000, content: '給与 架空商事', large: '収入' })];
+    const r = buildMonthlyReport(groupByMonth(withIncome), computeExclusions(withIncome, BUILTIN_RULES), '2025-10', '2024-10');
+    expect(r.prevMonth).toEqual({ diff: 20000, ratio: null });
+    expect(buildMonthlyReport(groupByMonth(list), excluded, '2025-08', '2024-10').lastYear).toBeNull();
+  });
+});

@@ -21,7 +21,8 @@ export function CategoryView() {
   const [large, setLarge] = useState<string | null>(null);
   const [middle, setMiddle] = useState<string | null>(null);
 
-  const oldestYm = transactions[transactions.length - 1]?.ym ?? '';
+  // 明細が1件でもある月（取り込んでいない月とは前月比・前年同月比を出さない）
+  const monthsWithData = useMemo(() => new Set(transactions.map((t) => t.ym)), [transactions]);
   // 前年同月比のため、表示期間の12か月前から計算する
   const ext = useMemo(() => (months.length ? ymRange(shiftYm(months[0], -12), months[months.length - 1]) : []), [months]);
   const offset = ext.length - months.length;
@@ -47,6 +48,8 @@ export function CategoryView() {
     : EXPENSE;
   const label = middle ? `${large}／${middle}` : large ?? '支出合計';
 
+  // 比べるどちらかの月に明細がなければ「—」（取り込んでいない月の 0 円と比べない）
+  const has = (m: string) => monthsWithData.has(m);
   const rows = months.map((ym, i) => {
     const j = i + offset;
     const prevYm = shiftYm(ym, -1);
@@ -54,8 +57,8 @@ export function CategoryView() {
     return {
       ym,
       amount: values[j],
-      mom: change(values[j], prevYm >= oldestYm ? values[j - 1] : undefined),
-      yoy: change(values[j], lastYearYm >= oldestYm ? values[j - 12] : undefined),
+      mom: change(values[j], has(ym) && has(prevYm) ? values[j - 1] : undefined),
+      yoy: change(values[j], has(ym) && has(lastYearYm) ? values[j - 12] : undefined),
     };
   });
   const chartData = rows.map((r) => ({ ym: r.ym, amount: r.amount }));

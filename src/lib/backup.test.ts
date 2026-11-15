@@ -60,3 +60,36 @@ describe('バックアップ', () => {
     expect(backupIsStale(1, true, 31 * day)).toBe(true);
   });
 });
+
+describe('バックアップ：除外ルールの条件の検証', () => {
+  const base = { app: 'mf-csv-viewer', format: 2, exportedAt: 1, transactions: [tx] };
+  const withCond = (cond: unknown) => JSON.stringify({ ...base, rules: [{ id: 'r', name: '壊れたルール', enabled: true, cond }] });
+
+  it('条件の形が正しくないルールがあれば、復元の前にエラーにする', () => {
+    for (const cond of [
+      { content: { op: 'equals' } },
+      { content: { op: 'regex', value: 'x' } },
+      { content: '架空ストア' },
+      { large: '食費' },
+      { institutions: [1, 2] },
+      { amountMin: '100' },
+      { amountMax: -1 },
+      { flow: 'both' },
+      { dateFrom: '2025/10/01' },
+    ]) {
+      expect(() => parseBackup(withCond(cond)), JSON.stringify(cond)).toThrow(BackupError);
+    }
+    expect(() => parseBackup(withCond({ content: { op: 'equals' } }))).toThrow('除外ルールの1件目「壊れたルール」の条件が正しくありません。');
+  });
+
+  it('正しい条件はそのまま読め、知らない項目は捨てる', () => {
+    const cond = { content: { op: 'startsWith', value: '架空' }, large: ['食費'], amountMin: 0, amountMax: 500, flow: 'expense', dateFrom: '2025-10-01', dateTo: '2025-10-31' };
+    expect(parseBackup(withCond({ ...cond, unknown: 1 })).rules[0].cond).toEqual(cond);
+    expect(parseBackup(withCond({})).rules[0].cond).toEqual({});
+  });
+
+  it('組み込みルールは条件を見ない', () => {
+    const json = JSON.stringify({ ...base, rules: [{ id: 'builtin-transfer', name: '振替', enabled: false, builtin: 'transfer', cond: { content: 1 } }] });
+    expect(parseBackup(json).rules[0]).toMatchObject({ builtin: 'transfer', enabled: false, cond: {} });
+  });
+});

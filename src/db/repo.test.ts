@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import Dexie from 'dexie';
 import { db, MfDatabase } from './schema';
 import { addDismissed, deleteAllData, deleteMonth, loadAll, removeDismissed, restoreBackup, saveImportBatch, saveImported, saveRules } from './repo';
+import { computeExclusions } from '../lib/rules';
 import type { Transaction } from '../lib/types';
 
 function tx(id: string, date: string): Transaction {
@@ -22,6 +23,13 @@ describe('repo（IndexedDB）', () => {
     expect(d.transactions).toEqual([]);
     expect(d.rules.map((r) => r.builtin)).toEqual(['transfer', 'nonTarget']);
     expect(await db.rules.count()).toBe(2);
+  });
+
+  it('条件の壊れたルールが保存されていても読み込める（そのルールは OFF にして残す）', async () => {
+    await db.rules.put({ id: 'x', name: '壊れたルール', enabled: true, order: 10, cond: { content: { op: 'equals' } }, createdAt: 0, updatedAt: 0 } as never);
+    const d = await loadAll();
+    expect(d.rules.find((r) => r.id === 'x')).toMatchObject({ enabled: false, cond: {} });
+    expect(() => computeExclusions([tx('a', '2025-08-01')], d.rules)).not.toThrow();
   });
 
   it('同じIDは上書き保存され、月単位で削除できる', async () => {
