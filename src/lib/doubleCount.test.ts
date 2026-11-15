@@ -224,6 +224,38 @@ describe('カード引き落とし', () => {
   });
 });
 
+describe('銀行の明細の書き方（小書きのカナを使わない）・金融機関名の判定', () => {
+  const withdrawals = (card: string, content: string, bank = BANK) => {
+    const ts = [
+      tx({ date: '2025-09-03', amount: -3210, institution: card, content: '架空マート' }),
+      tx({ date: '2025-10-27', amount: -99999, institution: bank, content }),
+    ];
+    return findWithdrawals(ts, none, noKeys).map((g) => g.card);
+  };
+
+  it('小書きのカナと大きいカナを同じ文字として扱う', () => {
+    expect(normalizeName('ｼﾞｴ-ｼ-ﾋﾞ-')).toBe(normalizeName('ジェーシービー'));
+    expect(normalizeName('ｼﾞﾔﾂｸｽ')).toBe(normalizeName('ジャックス'));
+    expect(normalizeName('きゃっしゅ')).toBe('キヤツシユ');
+  });
+
+  it('銀行の半角カナ表記（ｼﾞｴ-ｼ-ﾋﾞ-ｶ-ﾄﾞ など）でもカードの引き落としを見つける', () => {
+    expect(withdrawals('架空JCBカード', 'ｼﾞｴ-ｼ-ﾋﾞ-ｶ-ﾄﾞ')).toEqual(['架空JCBカード']);
+    expect(withdrawals('ジャックスカード', 'ｼﾞﾔﾂｸｽ ｶ-ﾄﾞ')).toEqual(['ジャックスカード']);
+    expect(withdrawals('ポケットカード', 'ﾎﾟｹﾂﾄｶ-ﾄﾞ')).toEqual(['ポケットカード']);
+    expect(withdrawals('セディナカード', 'ｾﾃﾞｲﾅｶ-ﾄﾞ')).toEqual(['セディナカード']);
+    // 小書きで書かれていても、これまでどおり見つかる
+    expect(withdrawals('架空JCBカード', 'ジェーシービーカード')).toEqual(['架空JCBカード']);
+  });
+
+  it('JAネットバンク・商工中金なども銀行、アメリカン・エキスプレスはカードと判定する', () => {
+    for (const name of ['JAネットバンク', 'ＪＡネットバンク', '商工中金', '農林中金']) expect(isBankInstitution(name), name).toBe(true);
+    for (const name of ['ソフトバンクまとめて支払い', 'ポケット架空マネー', '財布']) expect(isBankInstitution(name), name).toBe(false);
+    expect(isCardInstitution('アメリカン・エキスプレス')).toBe(true);
+    expect(withdrawals('架空JCBカード', 'ｼﾞｴ-ｼ-ﾋﾞ- 引落', 'JAネットバンク')).toEqual(['架空JCBカード']);
+  });
+});
+
 describe('重複購入', () => {
   const ec = '架空通販モール';
   it('金額が同じ・3日以内・金融機関が異なり、片方が通販の組を見つける', () => {
@@ -257,6 +289,24 @@ describe('重複購入', () => {
     const c = tx({ date: '2025-11-03', amount: -700, institution: 'Amazon.co.jp', content: '架空本' });
     const d = tx({ date: '2025-11-03', amount: -700, institution: CARD, content: 'AMAZON.CO.JP' });
     expect(findDuplicates([c, d], none, noKeys)[0].b.id).toBe(d.id);
+  });
+
+  it('片方が通販でも、相手がその支払いらしくなければ候補にしない', () => {
+    // 通販サイトの買い物と、同じ金額の財布・電子マネーの買い物（別々の買い物）
+    const site = tx({ date: '2025-11-03', amount: -1500, institution: 'Amazon.co.jp', content: '架空の本' });
+    expect(findDuplicates([site, tx({ date: '2025-11-04', amount: -1500, institution: 'その他架空現金', content: 'ランチ' })], none, noKeys)).toEqual([]);
+    expect(findDuplicates([site, tx({ date: '2025-11-04', amount: -1500, institution: 'ポケット架空マネー', content: '架空でんき' })], none, noKeys)).toEqual([]);
+    // カードの明細の内容が通販でも、別のカードの無関係な買い物とは組にしない
+    const cardA = tx({ date: '2025-11-03', amount: -1000, institution: CARD, content: 'AMAZON.CO.JP' });
+    const cardB = tx({ date: '2025-11-05', amount: -1000, institution: 'そよかぜ架空カード', content: 'カフェ架空' });
+    expect(findDuplicates([cardA, cardB], none, noKeys)).toEqual([]);
+  });
+
+  it('相手がカードでなくても、内容に通販の言葉があれば候補にする（デビットで払った銀行の明細など）', () => {
+    const site = tx({ date: '2025-11-03', amount: -1500, institution: 'Amazon.co.jp', content: '架空の本' });
+    const debit = tx({ date: '2025-11-04', amount: -1500, institution: BANK, content: 'ﾃﾞﾋﾞﾂﾄ AMAZON.CO.JP' });
+    const [p] = findDuplicates([site, debit], none, noKeys);
+    expect([p.kind, p.a.id, p.b.id]).toEqual(['ec', site.id, debit.id]);
   });
 
   it('1つの明細は日付の近い1組にだけ入れる', () => {
