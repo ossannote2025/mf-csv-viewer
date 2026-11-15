@@ -69,9 +69,9 @@ function MonthlyReport() {
   const calc = useMemo(() => {
     if (!ym) return null;
     const of = (m: string) => {
-      // データの期間より前の月は比較しない（0円と比べない）
-      if (m < oldestYm) return null;
-      const list = byMonth.get(m) ?? [];
+      // 明細が1件もない月（データの期間より前・取り込んでいない月）は比較しない（0円と比べない）
+      const list = m < oldestYm ? undefined : byMonth.get(m);
+      if (!list?.length) return null;
       const sum = totals(list, excluded);
       const cats = new Map(expenseByCategory(list, excluded).map((c) => [c.name, c.amount]));
       return { sum, cats };

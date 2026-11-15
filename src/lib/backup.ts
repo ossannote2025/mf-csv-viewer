@@ -1,3 +1,4 @@
+import { checkConditions } from './rules';
 import type { DismissedCandidate, ExclusionRule, ImportRecord, Transaction } from './types';
 
 export const BACKUP_APP = 'mf-csv-viewer';
@@ -81,13 +82,17 @@ function checkRule(r: unknown, i: number): ExclusionRule {
   if (!isObj(r) || !isStr(r.id) || !isStr(r.name) || !isBool(r.enabled) || !isObj(r.cond)) {
     throw new BackupError(`除外ルールの${i + 1}件目が正しくありません。`);
   }
+  const builtin = r.builtin === 'transfer' || r.builtin === 'nonTarget' ? r.builtin : undefined;
+  // 条件の中身も確かめる（壊れた条件を保存すると、次の起動で集計ができずアプリが開けなくなるため）
+  const cond = builtin ? {} : checkConditions(r.cond);
+  if (!cond) throw new BackupError(`除外ルールの${i + 1}件目「${r.name}」の条件が正しくありません。`);
   return {
     id: r.id,
     name: r.name,
     enabled: r.enabled,
-    builtin: r.builtin === 'transfer' || r.builtin === 'nonTarget' ? r.builtin : undefined,
+    builtin,
     order: isNum(r.order) ? r.order : 100 + i,
-    cond: r.cond as ExclusionRule['cond'],
+    cond,
     createdAt: isNum(r.createdAt) ? r.createdAt : 0,
     updatedAt: isNum(r.updatedAt) ? r.updatedAt : 0,
   };

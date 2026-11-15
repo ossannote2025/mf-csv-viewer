@@ -1,5 +1,5 @@
 import type { DismissedCandidate, ExclusionRule, ImportRecord, Transaction } from '../lib/types';
-import { ensureBuiltinRules } from '../lib/rules';
+import { ensureBuiltinRules, repairRules } from '../lib/rules';
 import type { BackupData } from '../lib/backup';
 import { db, type MetaEntry } from './schema';
 
@@ -19,8 +19,10 @@ export async function loadAll(): Promise<LoadedData> {
     db.imports.orderBy('importedAt').toArray(),
     db.dismissed.toArray(),
   ]);
-  const rules = ensureBuiltinRules(storedRules);
-  if (rules.length !== storedRules.length) await db.rules.bulkPut(rules);
+  const withBuiltin = ensureBuiltinRules(storedRules);
+  if (withBuiltin.length !== storedRules.length) await db.rules.bulkPut(withBuiltin);
+  // 条件の壊れたルールが保存されていても起動できるようにする（そのルールは OFF にして残す）
+  const rules = repairRules(withBuiltin);
   const meta: LoadedData['meta'] = {};
   for (const m of metaRows) meta[m.key] = m.value;
   return { transactions, rules, meta, imports, dismissed };
