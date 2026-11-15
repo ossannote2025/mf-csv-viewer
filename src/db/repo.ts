@@ -1,6 +1,7 @@
 import type { DismissedCandidate, ExclusionRule, ImportRecord, Transaction } from '../lib/types';
 import { ensureBuiltinRules, repairRules } from '../lib/rules';
-import type { BackupData } from '../lib/backup';
+import { repairTransactions, type BackupData } from '../lib/backup';
+import Dexie from 'dexie';
 import { db, type MetaEntry } from './schema';
 
 export interface LoadedData {
@@ -12,7 +13,7 @@ export interface LoadedData {
 }
 
 export async function loadAll(): Promise<LoadedData> {
-  const [transactions, storedRules, metaRows, imports, dismissed] = await Promise.all([
+  const [storedTransactions, storedRules, metaRows, imports, dismissed] = await Promise.all([
     db.transactions.toArray(),
     db.rules.toArray(),
     db.meta.toArray(),
@@ -21,7 +22,8 @@ export async function loadAll(): Promise<LoadedData> {
   ]);
   const withBuiltin = ensureBuiltinRules(storedRules);
   if (withBuiltin.length !== storedRules.length) await db.rules.bulkPut(withBuiltin);
-  // 条件の壊れたルールが保存されていても起動できるようにする（そのルールは OFF にして残す）
+  // 形の崩れた明細・条件の壊れたルールが保存されていても起動できるようにする（明細は形を整え、ルールは OFF にして残す）
+  const { transactions } = repairTransactions(storedTransactions);
   const rules = repairRules(withBuiltin);
   const meta: LoadedData['meta'] = {};
   for (const m of metaRows) meta[m.key] = m.value;
@@ -121,6 +123,51 @@ export async function deleteAllData(): Promise<void> {
   await db.transaction('rw', [db.transactions, db.rules, db.imports, db.meta, db.dismissed], async () => {
     await Promise.all([db.transactions.clear(), db.rules.clear(), db.imports.clear(), db.meta.clear(), db.dismissed.clear()]);
   });
+}
+
+/** 救済用に読み出したデータ。failed は読み出せなかったもの（画面に出す名前） */
+export interface RawData extends LoadedData {
+  failed: string[];
+  /** ID・日付・金額が正しくなく、取り出せなかった明細の件数 */
+  dropped: number;
+}
+
+/**
+ * 起動に失敗したときの救済用：保存されているデータを、集計などを通さずにそのまま読み出す。
+ * 読めないテーブルがあっても、読めたものだけを返す（1つの失敗で全部をあきらめない）
+ */
+export async function loadRaw(): Promise<RawData> {
+  const failed: string[] = [];
+  const read = async <T>(label: string, fn: () => Promise<T[]>): Promise<T[]> => {
+    try {
+      return await fn();
+    } catch {
+      failed.push(label);
+      return [];
+    }
+  };
+  const { transactions, dropped } = repairTransactions(await read<unknown>('明細', () => db.transactions.toArray()));
+  // 条件の壊れたルールは OFF・条件なしにしておく（そのまま書き出すと、復元のときにバックアップごと弾かれるため）
+  const rules = repairRules(ensureBuiltinRules(await read('除外ルール', () => db.rules.toArray())));
+  const imports = await read('取り込み履歴', () => db.imports.toArray());
+  const dismissed = await read('「二重ではない」の記録', () => db.dismissed.toArray());
+  const meta: LoadedData['meta'] = {};
+  for (const m of await read('最終取り込み日など', () => db.meta.toArray())) meta[m.key] = m.value;
+  return { transactions, rules, imports, dismissed, meta, failed, dropped };
+}
+
+/**
+ * 起動に失敗したときの救済用：全データを削除する。
+ * ふつうの削除ができないとき（データベース自体が開けないなど）は、データベースごと作り直す
+ */
+export async function resetDatabase(): Promise<void> {
+  try {
+    await deleteAllData();
+  } catch {
+    db.close();
+    await Dexie.delete(db.name);
+    await db.open();
+  }
 }
 
 /** ブラウザに保存領域の永続化をリクエストする（Safariの自動削除対策） */

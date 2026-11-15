@@ -39,6 +39,8 @@ export interface MissingReview {
 interface AppState {
   status: 'loading' | 'ready' | 'error';
   loadError?: string;
+  /** 起動に失敗したときの救済：全データを削除して読み込み直す */
+  rescueReset: () => Promise<void>;
   /** 日付の降順に並んだ全明細 */
   transactions: Transaction[];
   rules: ExclusionRule[];
@@ -143,7 +145,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   init: async () => {
     try {
       const data = await repo.loadAll();
-      set({ status: 'ready', meta: data.meta, imports: data.imports, ...withExclusions(sortByDateDesc(data.transactions), data.rules, data.dismissed) });
+      set({ status: 'ready', loadError: undefined, meta: data.meta, imports: data.imports, ...withExclusions(sortByDateDesc(data.transactions), data.rules, data.dismissed) });
       if (data.transactions.length > 0) set({ tab: 'transactions' });
       repo.requestPersistence().then((persisted) => set({ persisted }));
     } catch (e) {
@@ -152,6 +154,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         loadError: `データを読み込めませんでした（${errorMessage(e)}）。プライベートブラウズでは保存機能が使えない場合があります。`,
       });
     }
+  },
+
+  rescueReset: async () => {
+    await repo.resetDatabase();
+    set({ status: 'loading', loadError: undefined });
+    await get().init();
   },
 
   setTab: (tab) => set({ tab }),

@@ -6,6 +6,7 @@ import { Onboarding } from './features/onboarding/Onboarding';
 import { DoubleCountSheet } from './features/doubleCount/DoubleCountSheet';
 import { ImportDialogs } from './features/settings/ImportDialogs';
 import { MissingSheet } from './features/settings/MissingSheet';
+import { RescueScreen } from './features/settings/RescueScreen';
 import { SettingsTab } from './features/settings/SettingsTab';
 import { SummaryTab } from './features/summary/SummaryTab';
 import { TransactionsTab } from './features/transactions/TransactionsTab';
@@ -38,11 +39,7 @@ export default function App() {
   if (status === 'loading') {
     content = <p className="py-24 text-center text-muted">読み込み中…</p>;
   } else if (status === 'error') {
-    content = (
-      <Page title="エラー">
-        <p className="p-4 text-danger">{loadError}</p>
-      </Page>
-    );
+    content = <RescueScreen message={loadError ?? ''} />;
   } else if (!hasData && tab !== 'settings') {
     content = (
       <Page title={TITLES[tab]}>
