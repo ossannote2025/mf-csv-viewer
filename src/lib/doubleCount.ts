@@ -13,16 +13,21 @@ import type { DismissedCandidate, ExclusionMap, RuleConditions, Transaction } fr
 
 const nameCache = new Map<string, string>();
 
+const SMALL_KANA = 'ァィゥェォッャュョヮヵヶ';
+const LARGE_KANA = 'アイウエオツヤユヨワカケ';
+
 /**
  * 照合用の正規化：
  * NFKC（半角カナ→全角、全角英数→半角）、小文字、ひらがな→カタカナ、
- * カタカナの後の「-」は長音に、空白・記号は削除。
+ * 小書きのカナ（ャ・ュ・ョ・ッ・ェなど）→大きいカナ、カタカナの後の「-」は長音に、空白・記号は削除。
+ * 銀行の明細は小書きを使わない（ｼﾞｴ-ｼ-ﾋﾞ-、ｼﾞﾔﾂｸｽ）ので、どちらの書き方でも同じ文字列になるようにそろえる
  */
 export function normalizeName(s: string): string {
   const hit = nameCache.get(s);
   if (hit !== undefined) return hit;
   let n = s.normalize('NFKC').toLowerCase();
   n = n.replace(/[ぁ-ゖ]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60));
+  n = n.replace(/[ァィゥェォッャュョヮヵヶ]/g, (c) => LARGE_KANA[SMALL_KANA.indexOf(c)]);
   n = n.replace(/([ァ-ヺ])[-‐‑–—―−－]/g, '$1ー');
   n = n.replace(/[^\p{L}\p{N}ー]/gu, '');
   if (nameCache.size > 50000) nameCache.clear();
@@ -48,12 +53,12 @@ const NOT_WITHDRAWAL_WORDS = norm(['デビット', 'debit', 'ローン', 'loan',
 /** 金融機関名が銀行らしい言葉（引き落とし口座はこれらに限る） */
 const BANK_INSTITUTION_WORDS = norm([
   '銀行', 'ぎんこう', 'ギンコウ', '信用金庫', '信金', '信用組合', '信組', '労働金庫', '労金', 'ろうきん', 'ゆうちょ', 'ユウチョ',
-  'jaバンク', '農協', '農業協同組合', 'bank',
+  'jaバンク', 'ネットバンク', '農協', '農業協同組合', '中金', 'bank',
 ]);
 
 /** 金融機関名がカードらしい言葉 */
 const CARD_INSTITUTION_WORDS = norm([
-  'カード', 'card', 'クレジット', 'credit', 'vpass', 'jcb', 'アメックス', 'amex', 'americanexpress', 'ダイナース', 'diners',
+  'カード', 'card', 'クレジット', 'credit', 'vpass', 'jcb', 'アメックス', 'amex', 'americanexpress', 'アメリカンエキスプレス', 'ダイナース', 'diners',
   'ニコス', 'nicos', 'セゾン', 'saison', 'エポス', 'epos', 'オリコ', 'orico', 'ジャックス', 'jaccs', 'セディナ', 'cedyna',
 ]);
 
@@ -352,16 +357,25 @@ export function findWithdrawals(transactions: Transaction[], excluded: Exclusion
 const DAY_MS = 24 * 60 * 60 * 1000;
 const dayNumber = (date: string) => Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10))) / DAY_MS;
 
-/** 2件のうちどちらが通販側か（決められなければ undefined） */
+/**
+ * 2件のうちどちらが通販側か（決められなければ undefined）。
+ * 片方が通販らしいというだけでは組にしない（同じ金額の別々の買い物を拾ってしまうため）。相手がその支払いらしいときに限る：
+ * - 金融機関が通販サイト：相手がカードらしい金融機関か、相手の内容に通販の言葉がある（デビットで払った銀行の明細など）
+ * - 内容だけが通販（電子マネーなどの明細）：相手がカードらしい金融機関。通販の内容がカードの明細にあるときは、それ自体が支払い側なので組にしない
+ */
 function ecSide(a: Transaction, b: Transaction): { ec: Transaction; card: Transaction } | undefined {
   const ia = isEcommerceText(a.institution);
   const ib = isEcommerceText(b.institution);
-  if (ia !== ib) return ia ? { ec: a, card: b } : { ec: b, card: a };
   if (ia && ib) return undefined;
+  if (ia !== ib) {
+    const [ec, card] = ia ? [a, b] : [b, a];
+    return isCardInstitution(card.institution) || isEcommerceText(card.content) ? { ec, card } : undefined;
+  }
   const ca = isEcommerceText(a.content);
   const cb = isEcommerceText(b.content);
-  if (ca !== cb) return ca ? { ec: a, card: b } : { ec: b, card: a };
-  return undefined;
+  if (ca === cb) return undefined;
+  const [ec, card] = ca ? [a, b] : [b, a];
+  return !isCardInstitution(ec.institution) && isCardInstitution(card.institution) ? { ec, card } : undefined;
 }
 
 /** 内容が似ているかを見るときに取り除く、よくある言葉（これだけが共通でも似ているとみなさない） */
