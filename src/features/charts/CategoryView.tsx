@@ -3,7 +3,7 @@ import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from 'recharts';
 import { ChangeText } from '../../components/ChangeText';
 import { Card } from '../../components/Page';
 import { expenseByCategory } from '../../lib/aggregate';
-import { formatYm, shiftYm } from '../../lib/date';
+import { formatYm, formatYmShort, shiftYm } from '../../lib/date';
 import { formatYen } from '../../lib/format';
 import { categoryMonthMatrix, change, monthlySeries, ymRange } from '../../lib/series';
 import { categoryColor, rankIndex, shadeColor } from '../../lib/categoryColors';
@@ -125,30 +125,33 @@ export function CategoryView() {
       </Card>
 
       <Card title={`${label}：前月比・前年同月比`}>
-        <table className="tabular w-full text-sm">
+        {/* 金額の桁が多い月でも数字がくっつかないよう、列の間を空ける。それでも収まらないときは横にスクロールする */}
+        <div className="overflow-x-auto">
+        <table className="tabular w-full text-sm whitespace-nowrap">
           <thead>
             <tr className="text-xs text-muted">
               <th className="py-1 text-left font-normal">月</th>
-              <th className="py-1 text-right font-normal">支出</th>
-              <th className="py-1 text-right font-normal">前月比</th>
-              <th className="py-1 text-right font-normal">前年同月比</th>
+              <th className="py-1 pl-2 text-right font-normal">支出</th>
+              <th className="py-1 pl-2 text-right font-normal">前月比</th>
+              <th className="py-1 pl-2 text-right font-normal">前年同月比</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
             {[...rows].reverse().map((r) => (
               <tr key={r.ym}>
-                <td className="py-2 whitespace-nowrap">{formatYm(r.ym).replace('年', '/').replace('月', '')}</td>
-                <td className="py-2 text-right">{formatYen(r.amount)}</td>
-                <td className="py-2 text-right text-xs">
+                <td className="py-2 whitespace-nowrap">{formatYmShort(r.ym)}</td>
+                <td className="py-2 pl-2 text-right">{formatYen(r.amount)}</td>
+                <td className="py-2 pl-2 text-right text-xs">
                   <ChangeText c={r.mom} kind="expense" showRatio={false} />
                 </td>
-                <td className="py-2 text-right text-xs">
+                <td className="py-2 pl-2 text-right text-xs">
                   <ChangeText c={r.yoy} kind="expense" showRatio={false} />
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
         <p className="mt-2 text-xs text-muted">▲は増加、▼は減少。緑は家計に良い変化、赤は注意が必要な変化です。比較する月のデータがない場合は「—」です。</p>
       </Card>
 
@@ -164,7 +167,7 @@ export function CategoryView() {
                   <th className="px-2 py-1 text-right font-normal whitespace-nowrap">合計</th>
                   {[...months].reverse().map((ym) => (
                     <th key={ym} className="px-2 py-1 text-right font-normal whitespace-nowrap">
-                      {formatYm(ym).replace('年', '/').replace('月', '')}
+                      {formatYmShort(ym)}
                     </th>
                   ))}
                 </tr>

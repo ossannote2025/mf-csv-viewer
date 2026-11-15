@@ -18,7 +18,7 @@ export function Chips({ options, selected, onChange }: Props) {
             type="button"
             aria-pressed={on}
             onClick={() => onChange(on ? selected.filter((s) => s !== o) : [...selected, o])}
-            className={`min-h-11 rounded-full border px-3 text-sm ${on ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface'}`}
+            className={`min-h-11 min-w-11 rounded-full border px-3 text-sm ${on ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface'}`}
           >
             {o}
           </button>
@@ -46,7 +46,7 @@ export function Segmented<T extends string>({ value, options, onChange, tone = '
           type="button"
           aria-pressed={o.value === value}
           onClick={() => onChange(o.value)}
-          className={`h-10 flex-1 rounded-lg text-sm ${
+          className={`min-h-11 flex-1 rounded-lg px-1 text-sm leading-tight break-keep ${
             o.value === value
               ? onHeader
                 ? 'bg-on-header font-bold text-header-ink shadow-sm'

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDateFull, formatDay } from './date';
+import { formatDateFull, formatDay, formatYmShort } from './date';
 
 describe('formatDay', () => {
   it('年・月・日と曜日を表示する（ゼロ埋めなし）', () => {
@@ -15,5 +15,12 @@ describe('formatDay', () => {
 describe('formatDateFull', () => {
   it('YYYY/M/D 形式', () => {
     expect(formatDateFull('2025-08-03')).toBe('2025/8/3');
+  });
+});
+
+describe('formatYmShort', () => {
+  it("'YYYY-MM' を 'YYYY/M' にする", () => {
+    expect(formatYmShort('2026-11')).toBe('2026/11');
+    expect(formatYmShort('2024-02')).toBe('2024/2');
   });
 });

@@ -17,6 +17,12 @@ export function formatYm(ym: string): string {
   return `${y}年${Number(m)}月`;
 }
 
+/** 'YYYY-MM' → 'YYYY/M'（幅の狭い表で使う短い書き方） */
+export function formatYmShort(ym: string): string {
+  const [y, m] = ym.split('-');
+  return `${y}/${Number(m)}`;
+}
+
 /** 'YYYY-MM-DD' → 'YYYY/M/D（曜）'（年をまたいだ検索でも年が分かるよう、常に年を付ける） */
 export function formatDay(date: string): string {
   const [y, m, d] = date.split('-').map(Number);

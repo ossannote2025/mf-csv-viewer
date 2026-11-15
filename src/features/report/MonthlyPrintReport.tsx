@@ -107,7 +107,7 @@ export function MonthlyPrintReport({ ym }: { ym: string }) {
             戻る
           </button>
           <h1 className="truncate text-base font-bold">支出レポート</h1>
-          <button type="button" onClick={() => window.print()} className="h-10 rounded-lg bg-on-header px-4 text-sm font-bold text-header-ink">
+          <button type="button" onClick={() => window.print()} className="h-11 rounded-lg bg-on-header px-4 text-sm font-bold text-header-ink">
             印刷する
           </button>
         </div>
@@ -125,8 +125,8 @@ export function MonthlyPrintReport({ ym }: { ym: string }) {
             この月に、まだ確認していない二重計上の候補が<span className="tabular">{candidates}</span>件あります。除外していない明細はレポートに載ります。
           </p>
         )}
-        <details className="rounded-xl bg-surface p-3 shadow-sm">
-          <summary className="min-h-6 cursor-pointer font-bold">印刷・PDF保存のしかた</summary>
+        <details className="rounded-xl bg-surface px-3 py-0.5 shadow-sm">
+          <summary className="cursor-pointer py-3 font-bold">印刷・PDF保存のしかた</summary>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-muted">
             <li>「印刷する」を押すと印刷画面が開きます。用紙は A4 縦です。収入・振替・除外した明細は載りません。</li>
             <li>iPhone で PDF にするとき：印刷画面の右上の共有ボタン →「"ファイル"に保存」。</li>
