@@ -61,7 +61,7 @@ interface AppState {
   /** 集計タブ・グラフタブで選択中の月 */
   summaryYm?: string;
   chartView: ChartView;
-  summaryMode: 'month' | 'year';
+  summaryMode: 'month' | 'year' | 'recurring';
   /** 年間レポートで選択中の年 */
   reportYear?: string;
   /** グラフの期間（既定は直近12か月） */
@@ -83,7 +83,7 @@ interface AppState {
   showTransactions: (filter: Partial<TransactionFilter>) => void;
   setSummaryYm: (ym: string) => void;
   setChartView: (v: ChartView) => void;
-  setSummaryMode: (m: 'month' | 'year') => void;
+  setSummaryMode: (m: 'month' | 'year' | 'recurring') => void;
   setReportYear: (y: string) => void;
   setChartRange: (r: RangePreset) => void;
   openReport: (ym: string) => void;

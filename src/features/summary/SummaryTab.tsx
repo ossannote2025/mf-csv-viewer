@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Amount } from '../../components/Amount';
 import { Segmented } from '../../components/Chips';
 import { YearReport } from './YearReport';
+import { RecurringView } from './RecurringView';
 import { ChangeText } from '../../components/ChangeText';
 import { MonthPicker } from '../../components/MonthPicker';
 import { PeriodSwipeArea } from '../../components/PeriodSwipeArea';
@@ -30,11 +31,12 @@ export function SummaryTab() {
           options={[
             { value: 'month', label: '月次' },
             { value: 'year', label: '年間レポート' },
+            { value: 'recurring', label: '固定費' },
           ]}
         />
       }
     >
-      {mode === 'month' ? <MonthlyReport /> : <YearReport />}
+      {mode === 'month' ? <MonthlyReport /> : mode === 'year' ? <YearReport /> : <RecurringView />}
     </Page>
   );
 }
