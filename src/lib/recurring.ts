@@ -66,6 +66,8 @@ export interface RecurringItem {
   history: RecurringPoint[];
   /** 直近6か月以内の値上げ・値下げ */
   priceChange?: { from: number; to: number; ym: string };
+  /** 途中で内容の書き方が変わったときの、前の書き方（0.9.2） */
+  previousLabel?: string;
 }
 
 export interface RecurringResult {
@@ -103,9 +105,118 @@ const monthDiff = (a: string, b: string) => (Number(b.slice(0, 4)) - Number(a.sl
 
 interface Group {
   key: string;
+  /** 金額で分ける前のキー（同じ名前で金額の違う支払いを、名前が変わったものとして続けるため） */
+  baseKey: string;
+  txs: Transaction[];
   /** 月 → その月の合計・回数・日 */
   months: Map<string, { amount: number; count: number; days: number[] }>;
   last: Transaction;
+}
+
+/**
+ * 光熱費は、内容ではなく中項目でまとめる（0.9.2）。ガス会社などの書き方が変わっても続けて数えるため。
+ * 「光熱費」「その他…」のように種類の分からない中項目は、内容でまとめる
+ */
+const UTILITY_LARGE = '水道・光熱費';
+const GENERIC_MIDDLES = new Set(['光熱費', 'その他水道・光熱費', '未分類', 'その他']);
+
+function groupKey(t: Transaction): string {
+  if (t.large === UTILITY_LARGE && !GENERIC_MIDDLES.has(t.middle)) return `u|${t.middle}`;
+  return recurringKey(t.content);
+}
+
+function makeGroup(key: string, baseKey: string, txs: Transaction[]): Group {
+  const months: Group['months'] = new Map();
+  let last = txs[0];
+  for (const t of txs) {
+    if (t.date > last.date) last = t;
+    let m = months.get(t.ym);
+    if (!m) months.set(t.ym, (m = { amount: 0, count: 0, days: [] }));
+    m.amount += -t.amount;
+    m.count++;
+    m.days.push(Number(t.date.slice(8, 10)));
+  }
+  return { key, baseKey, txs, months, last };
+}
+
+/**
+ * 同じ名前で毎月2回以上あるもの（例：同じ請求名の2つのサブスク）は、金額ごとに分ける（0.9.2）。
+ * 金額が ±2% 以内のものを同じ支払いとみなす。光熱費（中項目でまとめたもの）は分けない
+ */
+function splitByAmount(key: string, txs: Transaction[]): Group[] {
+  const months = new Map<string, number>();
+  for (const t of txs) months.set(t.ym, (months.get(t.ym) ?? 0) + 1);
+  const multi = [...months.values()].filter((c) => c > 1).length;
+  if (key.startsWith('u|') || multi <= months.size * 0.2) return [makeGroup(key, key, txs)];
+  const sorted = [...txs].sort((a, b) => b.amount - a.amount);
+  const clusters: Transaction[][] = [];
+  let base = 0;
+  for (const t of sorted) {
+    const amount = -t.amount;
+    if (clusters.length === 0 || amount > base * (1 + STABLE_RATIO)) {
+      clusters.push([]);
+      base = amount;
+    }
+    clusters[clusters.length - 1].push(t);
+  }
+  if (clusters.length === 1) return [makeGroup(key, key, txs)];
+  return clusters.map((c, i) => makeGroup(`${key}#${i}`, key, c));
+}
+
+const dayDistance = (a: number, b: number) => {
+  const diff = Math.abs(a - b);
+  return Math.min(diff, 31 - diff);
+};
+
+/**
+ * 内容の書き方が変わった毎月の支払いを、前の書き方とつなぐ（0.9.2）。
+ * 前の書き方が止まった次の月から、同じ日ごろ（±5日）・同じくらいの金額（±10%。もとが同じ名前なら金額は問わない）で
+ * 始まったものが1つだけあれば、同じ支払いとみなす
+ */
+function linkRenamed(groups: Group[], latestYm: string): Group[] {
+  const byFirst = new Map<string, Group[]>();
+  const firstOf = (g: Group) => [...g.months.keys()].sort()[0];
+  for (const g of groups) {
+    const f = firstOf(g);
+    byFirst.set(f, [...(byFirst.get(f) ?? []), g]);
+  }
+  const merged = new Set<Group>();
+  const result: Group[] = [];
+  // 古いものから順に見る（A→B→C と2回変わっても1つにつなぐ）
+  const ordered = [...groups].sort((a, b) => (firstOf(a) < firstOf(b) ? -1 : 1));
+  for (const g of ordered) {
+    if (merged.has(g)) continue;
+    let cur = g;
+    for (;;) {
+      if (!asMonthly(cur, [...cur.months.keys()].sort(), latestYm)) break;
+      const lastYm = [...cur.months.keys()].sort().at(-1)!;
+      const lastAmount = cur.months.get(lastYm)!.amount;
+      const lastDay = Math.min(...cur.months.get(lastYm)!.days);
+      const next = (byFirst.get(shiftYm(lastYm, 1)) ?? []).filter((b) => {
+        if (b === cur || merged.has(b)) return false;
+        const m = b.months.get(firstOf(b))!;
+        if (m.count !== 1 || dayDistance(Math.min(...m.days), lastDay) > DAY_TOLERANCE) return false;
+        return b.baseKey === cur.baseKey || Math.abs(m.amount - lastAmount) <= lastAmount * PERIODIC_AMOUNT_RATIO;
+      });
+      if (next.length !== 1) break;
+      merged.add(next[0]);
+      cur = makeGroup(next[0].key, next[0].baseKey, [...cur.txs, ...next[0].txs]);
+    }
+    result.push(cur);
+  }
+  return result;
+}
+
+/** 続いている期間のうち、最後の書き方と違う、いちばん新しい書き方 */
+function previousLabelOf(g: Group, run: string[]): string | undefined {
+  const lastKey = recurringKey(g.last.content);
+  const inRun = new Set(run);
+  let prev: Transaction | undefined;
+  for (const t of g.txs) {
+    if (!inRun.has(t.ym) || recurringKey(t.content) === lastKey) continue;
+    if (!prev || t.date > prev.date) prev = t;
+  }
+  return prev?.content;
 }
 
 /**
@@ -138,6 +249,7 @@ function baseItem(g: Group, intervalMonths: number, occ: string[]): Omit<Recurri
     day: Math.round(median(days)),
     month: Number(lastYm.slice(5, 7)),
     lastYm,
+    previousLabel: previousLabelOf(g, occ),
   };
 }
 
@@ -153,11 +265,7 @@ function asMonthly(g: Group, occ: string[], latestYm: string): RecurringItem | u
   // 引き落とされる日がそろっている（いつもの日 ±5日に8割以上の月）。日がばらばらな食事・電車などを外す（0.9.1）
   // 月末と月初をまたぐ（30日・2日など）ので、日の差は月をまたいで測り、いつもの日は「近い月がいちばん多い日」にする
   const firstDays = run.map((ym) => Math.min(...g.months.get(ym)!.days));
-  const nearCount = (usual: number) =>
-    firstDays.filter((d) => {
-      const diff = Math.abs(d - usual);
-      return Math.min(diff, 31 - diff) <= DAY_TOLERANCE;
-    }).length;
+  const nearCount = (usual: number) => firstDays.filter((d) => dayDistance(d, usual) <= DAY_TOLERANCE).length;
   if (Math.max(...firstDays.map(nearCount)) < run.length * DAY_MATCH_RATIO) return undefined;
 
   const points = run.map((ym) => ({ ym, amount: g.months.get(ym)!.amount }));
@@ -207,28 +315,27 @@ function asPeriodic(g: Group, occ: string[]): RecurringItem | undefined {
 
 /** 固定費・定期支払いを見つける。支出だけ（振替・計算対象外・除外した明細・食費などの大項目は使わない） */
 export function findRecurring(transactions: Iterable<Transaction>, excluded: ExclusionMap): RecurringResult {
-  const groups = new Map<string, Group>();
+  const byKey = new Map<string, Transaction[]>();
   let latestYm = '';
   for (const t of transactions) {
     if (t.ym > latestYm) latestYm = t.ym;
     if (t.amount >= 0 || t.isTransfer || !t.isTarget || excluded.has(t.id)) continue;
     if (NON_FIXED_CATEGORIES.has(t.large) || NON_FIXED_MIDDLE_CATEGORIES.has(`${t.large}/${t.middle}`)) continue;
-    const key = recurringKey(t.content);
+    const key = groupKey(t);
     if (key.length < 2) continue;
-    let g = groups.get(key);
-    if (!g) groups.set(key, (g = { key, months: new Map(), last: t }));
-    if (t.date > g.last.date) g.last = t;
-    let m = g.months.get(t.ym);
-    if (!m) g.months.set(t.ym, (m = { amount: 0, count: 0, days: [] }));
-    m.amount += -t.amount;
-    m.count++;
-    m.days.push(Number(t.date.slice(8, 10)));
+    const list = byKey.get(key);
+    if (list) list.push(t);
+    else byKey.set(key, [t]);
   }
+  const groups = linkRenamed(
+    [...byKey.entries()].flatMap(([key, txs]) => splitByAmount(key, txs)),
+    latestYm,
+  );
 
   const monthly: RecurringItem[] = [];
   const periodic: RecurringItem[] = [];
   const stopped: RecurringItem[] = [];
-  for (const g of groups.values()) {
+  for (const g of groups) {
     const occ = [...g.months.keys()].sort();
     const item = asMonthly(g, occ, latestYm) ?? asPeriodic(g, occ);
     if (!item) continue;

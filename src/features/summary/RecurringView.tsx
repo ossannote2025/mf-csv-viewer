@@ -98,6 +98,7 @@ function Row({ item, stopped }: { item: RecurringItem; stopped?: boolean }) {
         <span className="mt-0.5 block truncate text-xs text-muted">
           {schedule(item, stopped)}・{item.institution}
         </span>
+        {item.previousLabel && <span className="mt-0.5 block truncate text-xs text-muted">以前の名前：{item.previousLabel}</span>}
         <Spark points={item.history} />
         {item.priceChange && !stopped && (
           <span className="tabular mt-1.5 inline-block rounded-md bg-warn-soft px-2 py-0.5 text-xs font-bold text-warn-ink">
