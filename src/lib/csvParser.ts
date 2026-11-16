@@ -83,6 +83,8 @@ export function parseMfCsv(text: string, fileName: string, importedAt = Date.now
   // 区切り文字はカンマ・タブを自動判定
   const parsed = Papa.parse<string[]>(body, { skipEmptyLines: 'greedy', delimitersToGuess: [',', '\t'] });
   const rows = parsed.data;
+  // 引用符（"）の対応が崩れた行（PapaParse の row は data の添字）。列がずれたときだけエラーにする（B11）
+  const quoteErrorRows = new Set(parsed.errors.filter((e) => e.type === 'Quotes' && e.row !== undefined).map((e) => e.row as number));
   if (rows.length === 0) {
     result.fileError = 'ファイルにデータがありません。';
     return result;
@@ -116,6 +118,10 @@ export function parseMfCsv(text: string, fileName: string, importedAt = Date.now
     const row = rows[i];
     const line = i + 1;
     if (row.every((c) => c.trim() === '')) continue;
+    if (quoteErrorRows.has(i) && row.length !== rows[0].length) {
+      result.rowErrors.push({ line, message: '引用符（"）の対応が崩れていて、列がずれています' });
+      continue;
+    }
 
     const id = get(row, 'id') ?? '';
     if (id === '') {
@@ -153,7 +159,9 @@ export function parseMfCsv(text: string, fileName: string, importedAt = Date.now
     });
   }
 
-  if (result.transactions.length === 0 && result.rowErrors.length > 0) {
+  if (result.transactions.length === 0 && result.rowErrors.length === 0) {
+    result.fileError = '1行目（見出し）だけで、明細の行がありません。';
+  } else if (result.transactions.length === 0) {
     result.fileError = `読み込める行がありませんでした（${result.rowErrors[0].line}行目: ${result.rowErrors[0].message} など）。`;
   }
   return result;

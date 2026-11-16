@@ -19,6 +19,14 @@ describe('decodeCsvBytes', () => {
     expect(r.text).toBe(text);
   });
 
+  it('UTF-16（BOMあり。リトル／ビッグエンディアン）を判定して読める', () => {
+    const le = new Uint8Array([0xff, 0xfe, ...Buffer.from(text, 'utf16le')]);
+    expect(decodeCsvBytes(le)).toEqual({ text, encoding: 'utf-16' });
+    const be = Buffer.from(text, 'utf16le');
+    be.swap16();
+    expect(decodeCsvBytes(new Uint8Array([0xfe, 0xff, ...be]))).toEqual({ text, encoding: 'utf-16' });
+  });
+
   it('UTF-8（BOMなし）を判定する', () => {
     const r = decodeCsvBytes(new Uint8Array(Buffer.from(text, 'utf-8')).buffer);
     expect(r.encoding).toBe('utf-8');
