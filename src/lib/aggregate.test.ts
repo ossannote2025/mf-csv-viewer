@@ -69,6 +69,12 @@ describe('applyFilter', () => {
     expect(run({ keyword: 'カフェ 友人' })).toEqual(['ｶﾌｪ ミモザ']);
     expect(run({ keyword: 'カフェ スーパー' })).toEqual([]);
   });
+  it('決まった明細だけを出す（固定費の行から開いたとき）。ほかの条件とも組み合わせる', () => {
+    const ids = [ts[0].id, ts[1].id, 'ex'];
+    expect(run({ pinned: { label: '固定費：x', ids } })).toEqual(['まるまるスーパー', 'ｶﾌｪ ミモザ', '振替']);
+    expect(run({ pinned: { label: '固定費：x', ids }, showExcluded: false })).toEqual(['まるまるスーパー', 'ｶﾌｪ ミモザ']);
+    expect(run({ pinned: { label: '固定費：x', ids: [] } })).toEqual([]);
+  });
   it('期間・収支・金額範囲・カテゴリ・金融機関', () => {
     expect(run(monthRange('2025-08'))).toEqual(['まるまるスーパー', '給与', '振替']);
     expect(run({ flow: 'income' })).toEqual(['給与']);

@@ -26,6 +26,7 @@ export function TransactionsTab() {
   const excluded = useAppStore((s) => s.excluded);
   const rules = useAppStore((s) => s.rules);
   const filter = useAppStore((s) => s.filter);
+  const resetFilter = useAppStore((s) => s.resetFilter);
   const setFilter = useAppStore((s) => s.setFilter);
   const [filterOpen, setFilterOpen] = useState(false);
   const [selected, setSelected] = useState<Transaction | null>(null);
@@ -60,9 +61,11 @@ export function TransactionsTab() {
 
   const listRef = useRef<HTMLDivElement>(null);
   const [scrollMargin, setScrollMargin] = useState(0);
+  // 上の帯（固定費から開いたとき）の有無で一覧の位置が変わるので、測り直す
+  const hasPinned = !!filter.pinned;
   useLayoutEffect(() => {
     setScrollMargin(listRef.current?.offsetTop ?? 0);
-  }, []);
+  }, [hasPinned]);
 
   const virtualizer = useWindowVirtualizer({
     count: items.length,
@@ -144,6 +147,14 @@ export function TransactionsTab() {
             {nFilters > 0 && <span className="ml-0.5 rounded-full bg-surface px-1.5 text-xs text-accent">{nFilters}</span>}
           </button>
         </div>
+        {filter.pinned && (
+          <div className="mt-2 flex items-center gap-2 rounded-xl bg-accent-soft pl-3 text-sm">
+            <span className="min-w-0 flex-1 truncate font-medium">{filter.pinned.label} の明細</span>
+            <button type="button" onClick={resetFilter} className="flex size-11 shrink-0 items-center justify-center" aria-label="固定費の明細の表示をやめて、すべての明細を表示する">
+              <CloseIcon className="size-4" />
+            </button>
+          </div>
+        )}
         <div className="tabular mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs text-muted">
           <span>{formatCount(filtered.length)}</span>
           <span>

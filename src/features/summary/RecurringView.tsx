@@ -61,12 +61,6 @@ function Section({ title, items, stopped }: { title: string; items: RecurringIte
   );
 }
 
-/** 明細の検索に使う言葉：「10月分」などの数字より前の部分（月ごとに変わる部分で検索が外れないように） */
-function searchWord(label: string): string {
-  const head = label.split(/[0-9０-９]/)[0].trim();
-  return head.length >= 2 ? head : label;
-}
-
 function schedule(item: RecurringItem, stopped?: boolean): string {
   const unit = item.intervalMonths === 1 ? 'か月' : item.intervalMonths === 12 ? '年' : '回';
   if (stopped) return `${formatYm(item.lastYm)}まで（${item.count}${unit}続いていました）`;
@@ -87,7 +81,7 @@ function Row({ item, stopped }: { item: RecurringItem; stopped?: boolean }) {
   return (
     <button
       type="button"
-      onClick={() => showTransactions({ keyword: searchWord(item.label), flow: 'expense' })}
+      onClick={() => showTransactions({ pinned: { label: `固定費：${item.label}`, ids: item.ids } })}
       className="flex min-h-12 w-full items-center gap-2 rounded-lg px-2 py-2.5 text-left active:bg-bg"
     >
       <span className="min-w-0 flex-1">

@@ -161,6 +161,12 @@ describe('findRecurring', () => {
       ['架空ストア ジャパン', 1280, 13, '架空動画 プレミアム'],
       ['架空ストア ジャパン', 250, 13, '架空クラウド ストレージ'],
     ]);
+    // 行ごとの明細：前の名前の明細を含み、同じ名前のもう片方は含まない
+    const byId = new Map(ts.map((t) => [t.id, t]));
+    const contents = (ids: string[]) => [...new Set(ids.map((id) => `${byId.get(id)!.content} ${-byId.get(id)!.amount}`))].sort();
+    expect(r.monthly[0].ids).toHaveLength(13);
+    expect(contents(r.monthly[0].ids)).toEqual(['架空ストア ジャパン 1280', '架空動画 プレミアム 1280']);
+    expect(contents(r.monthly[1].ids)).toEqual(['架空クラウド ストレージ 250', '架空ストア ジャパン 250']);
     expect(r.stopped).toEqual([]);
     expect(r.monthlyTotal).toBe(1530);
   });

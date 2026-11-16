@@ -68,6 +68,8 @@ export interface RecurringItem {
   priceChange?: { from: number; to: number; ym: string };
   /** 途中で内容の書き方が変わったときの、前の書き方（0.9.2） */
   previousLabel?: string;
+  /** この行にまとめた明細の ID（タップで明細一覧に出す。0.9.3） */
+  ids: string[];
 }
 
 export interface RecurringResult {
@@ -250,6 +252,7 @@ function baseItem(g: Group, intervalMonths: number, occ: string[]): Omit<Recurri
     month: Number(lastYm.slice(5, 7)),
     lastYm,
     previousLabel: previousLabelOf(g, occ),
+    ids: g.txs.map((t) => t.id),
   };
 }
 
