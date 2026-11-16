@@ -111,6 +111,27 @@ describe('parseMfCsv', () => {
     expect(r.rowErrors[0].message).toContain('日付');
   });
 
+  it('見出しだけで明細の行がなければファイルエラー', () => {
+    const r = parseMfCsv(HEADER + '\r\n', 'h.csv');
+    expect(r.fileError).toBe('1行目（見出し）だけで、明細の行がありません。');
+    expect(r.transactions).toEqual([]);
+  });
+
+  it('引用符の対応が崩れて列がずれた行は、その理由で読み飛ばす（列がずれなければ取り込む）', () => {
+    const csv = [
+      HEADER,
+      '"1","2025/8/1","架空,"-100","架空カード","食費","食料品","","0","Q1"',
+      '"1","2025/8/2","架空"店","-200","架空カード","食費","食料品","","0","Q2"',
+      '"1","2025/8/3","架空","-300","架空カード","食費","食料品","","0","Q3"',
+    ].join('\n');
+    const r = parseMfCsv(csv, 'q.csv');
+    expect(r.rowErrors).toEqual([{ line: 2, message: '引用符（"）の対応が崩れていて、列がずれています' }]);
+    expect(r.transactions.map((t) => [t.id, t.content])).toEqual([
+      ['Q2', '架空"店'],
+      ['Q3', '架空'],
+    ]);
+  });
+
   it('全行が不正ならファイルエラー', () => {
     const csv = [HEADER, '"1","bad","x","-1","X","a","b","","0","A"'].join('\n');
     expect(parseMfCsv(csv, 'd.csv').fileError).toContain('2行目');
