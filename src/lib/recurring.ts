@@ -16,8 +16,17 @@ const PRICE_CHANGE_RATIO = 0.05;
 const STABLE_RATIO = 0.02;
 /** 「最近止まったもの」に出す期間（最新の月から何か月前までに止まったものか） */
 const STOPPED_WITHIN_MONTHS = 12;
-/** 数か月ごと・毎年のものとみなす金額の揺れ */
-const PERIODIC_AMOUNT_RATIO = 0.3;
+/** 数か月ごと・毎年のものとみなす金額の揺れ（0.9.1 で ±30% → ±10%。年ごとに金額の違う買い物を拾わないため） */
+const PERIODIC_AMOUNT_RATIO = 0.1;
+/** 毎月のもの：いつもの日から何日以内なら「同じ日」とみなすか */
+const DAY_TOLERANCE = 5;
+/** 毎月のもの：いつもの日に出た月が何割以上なら固定費とみなすか */
+const DAY_MATCH_RATIO = 0.8;
+/**
+ * 固定費の候補にしない大項目（0.9.1。ユーザーと相談して決定）。
+ * たまたま毎月同じ店で食事した・同じ電車に乗った・ATM の手数料がかかった、などを拾わないため
+ */
+export const NON_FIXED_CATEGORIES = new Set(['食費', '日用品', '交通費', '衣服・美容', '交際費', '現金・カード', '特別な支出']);
 /** 数か月ごとの支払いとみなす間隔 */
 const PERIODIC_INTERVALS = [2, 3, 4, 6, 12];
 
@@ -135,6 +144,15 @@ function asMonthly(g: Group, occ: string[], latestYm: string): RecurringItem | u
   // 月に2回以上の月が2割を超えるもの（スーパーなど、ふだんの買い物）は外す
   const multi = run.filter((ym) => g.months.get(ym)!.count > 1).length;
   if (multi > run.length * 0.2) return undefined;
+  // 引き落とされる日がそろっている（いつもの日 ±5日に8割以上の月）。日がばらばらな食事・電車などを外す（0.9.1）
+  // 月末と月初をまたぐ（30日・2日など）ので、日の差は月をまたいで測り、いつもの日は「近い月がいちばん多い日」にする
+  const firstDays = run.map((ym) => Math.min(...g.months.get(ym)!.days));
+  const nearCount = (usual: number) =>
+    firstDays.filter((d) => {
+      const diff = Math.abs(d - usual);
+      return Math.min(diff, 31 - diff) <= DAY_TOLERANCE;
+    }).length;
+  if (Math.max(...firstDays.map(nearCount)) < run.length * DAY_MATCH_RATIO) return undefined;
 
   const points = run.map((ym) => ({ ym, amount: g.months.get(ym)!.amount }));
   const priceChange = findPriceChange(points, latestYm);
@@ -155,7 +173,7 @@ function asMonthly(g: Group, occ: string[], latestYm: string): RecurringItem | u
 
 /**
  * 数か月ごと・毎年のもの：同じ間隔で続いている（毎年は2回以上、それより短い間隔は4回以上）。
- * 毎回1件だけで、金額が近い（±30%）。たまたま同じ間隔になったふだんの買い物を拾わないため
+ * 毎回1件だけで、金額が近い（±10%）。たまたま同じ間隔になったふだんの買い物を拾わないため
  */
 function asPeriodic(g: Group, occ: string[]): RecurringItem | undefined {
   if (occ.length < 2) return undefined;
@@ -181,13 +199,14 @@ function asPeriodic(g: Group, occ: string[]): RecurringItem | undefined {
   };
 }
 
-/** 固定費・定期支払いを見つける。支出だけ（振替・計算対象外・除外した明細は使わない） */
+/** 固定費・定期支払いを見つける。支出だけ（振替・計算対象外・除外した明細・食費などの大項目は使わない） */
 export function findRecurring(transactions: Iterable<Transaction>, excluded: ExclusionMap): RecurringResult {
   const groups = new Map<string, Group>();
   let latestYm = '';
   for (const t of transactions) {
     if (t.ym > latestYm) latestYm = t.ym;
     if (t.amount >= 0 || t.isTransfer || !t.isTarget || excluded.has(t.id)) continue;
+    if (NON_FIXED_CATEGORIES.has(t.large)) continue;
     const key = recurringKey(t.content);
     if (key.length < 2) continue;
     let g = groups.get(key);
