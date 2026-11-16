@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { categoryMonthMatrix, change, changeTone, monthlySeries, presetRange, ymRange } from './series';
+import { categoryMonthMatrix, change, changeTone, currentYm, monthlyAverage, monthlySeries, presetRange, ymRange } from './series';
 import type { ExclusionMap, Transaction } from './types';
 
 let n = 0;
@@ -85,5 +85,29 @@ describe('changeTone', () => {
   it('増減なし・比較対象なしは中立', () => {
     expect(changeTone(change(1000, 1000), 'expense')).toBe('neutral');
     expect(changeTone(null, 'income')).toBe('neutral');
+  });
+});
+
+describe('monthlyAverage（月平均）', () => {
+  const p = (ym: string, income: number, expense: number) => ({ ym, income, expense, balance: income - expense });
+
+  it('途中の今月を外して平均する', () => {
+    const a = monthlyAverage([p('2025-09', 300, 100), p('2025-10', 100, 300), p('2025-11', 10, 20)], '2025-11');
+    expect(a).toEqual({ income: 200, expense: 200, balance: 0, months: 2, skippedCurrent: true });
+  });
+
+  it('今月がなければ、明細のない月（0円）も含めてすべての月で割る', () => {
+    const a = monthlyAverage([p('2025-09', 300, 300), p('2025-10', 0, 0), p('2025-11', 0, 300)], '2025-12');
+    expect(a).toEqual({ income: 100, expense: 200, balance: -100, months: 3, skippedCurrent: false });
+  });
+
+  it('今月しかないときは今月で計算する・空なら 0', () => {
+    expect(monthlyAverage([p('2025-11', 10, 20)], '2025-11')).toEqual({ income: 10, expense: 20, balance: -10, months: 1, skippedCurrent: false });
+    expect(monthlyAverage([], '2025-11')).toEqual({ income: 0, expense: 0, balance: 0, months: 0, skippedCurrent: false });
+  });
+
+  it('今日の年月', () => {
+    expect(currentYm(new Date(2026, 0, 31))).toBe('2026-01');
+    expect(currentYm(new Date(2026, 11, 1))).toBe('2026-12');
   });
 });

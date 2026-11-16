@@ -4,7 +4,7 @@ import { Amount } from '../../components/Amount';
 import { Card } from '../../components/Page';
 import { formatYm, formatYmShort } from '../../lib/date';
 import { formatYen } from '../../lib/format';
-import { monthlySeries } from '../../lib/series';
+import { monthlyAverage, monthlySeries } from '../../lib/series';
 import { useAppStore } from '../../store/useAppStore';
 import { axisMonth, axisYen, EXPENSE, GRID, INCOME, INK, MUTED } from './chartTheme';
 import { ChartTooltip, Legend, RangeChips, ScrollableChart } from './common';
@@ -20,7 +20,8 @@ export function TrendView() {
   const data = useMemo(() => monthlySeries(transactions, excluded, months), [transactions, excluded, months]);
 
   const sum = data.reduce((a, p) => ({ income: a.income + p.income, expense: a.expense + p.expense }), { income: 0, expense: 0 });
-  const n = data.length || 1;
+  // 月平均は途中の今月を除いて計算する
+  const avg = monthlyAverage(data);
   // 一覧の表：7桁以上の金額があるか
   const wide = data.some((p) => Math.max(p.income, p.expense, Math.abs(p.balance)) >= 1_000_000);
 
@@ -72,21 +73,22 @@ export function TrendView() {
           <div>
             <dt className="text-xs text-muted">収入合計</dt>
             <dd className="font-bold text-income">{formatYen(sum.income)}</dd>
-            <dd className="text-xs text-muted">月平均 {formatYen(sum.income / n)}</dd>
+            <dd className="text-xs text-muted">月平均 {formatYen(avg.income)}</dd>
           </div>
           <div>
             <dt className="text-xs text-muted">支出合計</dt>
             <dd className="font-bold text-expense">{formatYen(sum.expense)}</dd>
-            <dd className="text-xs text-muted">月平均 {formatYen(sum.expense / n)}</dd>
+            <dd className="text-xs text-muted">月平均 {formatYen(avg.expense)}</dd>
           </div>
           <div>
             <dt className="text-xs text-muted">収支</dt>
             <dd className="font-bold">
               <Amount value={sum.income - sum.expense} />
             </dd>
-            <dd className="text-xs text-muted">月平均 {formatYen((sum.income - sum.expense) / n)}</dd>
+            <dd className="text-xs text-muted">月平均 {formatYen(avg.balance)}</dd>
           </div>
         </dl>
+        {avg.skippedCurrent && <p className="mt-2 text-xs text-muted">月平均は、途中の今月を除いた{avg.months}か月で計算しています。</p>}
       </Card>
 
       <Card title="月別の一覧">
