@@ -56,6 +56,14 @@ export interface ParseResult {
   ownExport?: boolean;
 }
 
+/**
+ * このアプリの CSV 書き出しが数式対策で先頭に付けた ' を外す（exportCsv.ts の safeText の逆）。
+ * 付けたままだと、取り込み直したときに内容が変わり、内容一致の除外ルールが外れる
+ */
+function unsafeText(v: string): string {
+  return /^'+[=+\-@\t\r]/.test(v) ? v.slice(1).trim() : v;
+}
+
 function flag(raw: string | undefined, defaultValue: boolean): boolean {
   if (raw === undefined) return defaultValue;
   const s = raw.normalize('NFKC').trim();
@@ -98,6 +106,11 @@ export function parseMfCsv(text: string, fileName: string, importedAt = Date.now
 
   const get = (row: string[], key: ColumnKey): string | undefined =>
     index[key] >= 0 ? (row[index[key]] ?? '').trim() : undefined;
+  /** 文字の列（内容・金融機関・項目・メモ）。このアプリが書き出した CSV なら、数式対策の ' を外す */
+  const str = (row: string[], key: ColumnKey): string | undefined => {
+    const v = get(row, key);
+    return v !== undefined && result.ownExport ? unsafeText(v) : v;
+  };
 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
@@ -126,12 +139,12 @@ export function parseMfCsv(text: string, fileName: string, importedAt = Date.now
       id,
       date,
       ym: date.slice(0, 7),
-      content: get(row, 'content') ?? '',
+      content: str(row, 'content') ?? '',
       amount,
-      institution: get(row, 'institution') ?? '',
-      large: get(row, 'large') || '未分類',
-      middle: get(row, 'middle') || '未分類',
-      memo: get(row, 'memo') ?? '',
+      institution: str(row, 'institution') ?? '',
+      large: str(row, 'large') || '未分類',
+      middle: str(row, 'middle') || '未分類',
+      memo: str(row, 'memo') ?? '',
       isTarget: flag(get(row, 'isTarget'), true),
       isTransfer: flag(get(row, 'isTransfer'), false),
       sourceFile: fileName,

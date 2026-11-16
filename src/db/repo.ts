@@ -112,7 +112,11 @@ export async function restoreBackup(data: BackupData, mode: 'replace' | 'merge')
     await db.transactions.bulkPut(data.transactions);
     await db.rules.bulkPut(data.rules);
     if (data.dismissed.length) await db.dismissed.bulkPut(data.dismissed);
-    if (data.imports.length) await db.imports.bulkAdd(data.imports.map((r) => ({ ...r })));
+    // 同じバックアップを何度マージしても、取り込み履歴が増えないようにする（ファイル名と日時が同じものは足さない）
+    const key = (r: { fileName: string; importedAt: number }) => `${r.importedAt}|${r.fileName}`;
+    const seen = new Set((await db.imports.toArray()).map(key));
+    const fresh = data.imports.filter((r) => !seen.has(key(r)) && !!seen.add(key(r)));
+    if (fresh.length) await db.imports.bulkAdd(fresh.map((r) => ({ ...r })));
     if (data.meta.lastImportAt) await db.meta.put({ key: 'lastImportAt', value: data.meta.lastImportAt });
     if (data.exportedAt) await db.meta.put({ key: 'lastBackupAt', value: data.exportedAt });
   });
