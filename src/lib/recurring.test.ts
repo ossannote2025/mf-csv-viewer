@@ -171,6 +171,39 @@ describe('findRecurring', () => {
     expect(r.monthlyTotal).toBe(1530);
   });
 
+  it('同じ名前で毎月2件・金額が毎月変わる支払い（家族2人分の携帯料金）も、2行に分ける', () => {
+    const ts = [
+      latest,
+      // 以前は1件だけ（高いほうの回線）
+      ...monthly('2023-01', '2025-12', 30, (_ym, i) => 2600 + ((i * 97) % 400), '架空テレコム利用料金'),
+      // 2026年から毎月2件。どちらも通話料で金額が変わる
+      ...monthly('2026-01', '2026-11', 30, (_ym, i) => 2500 + ((i * 173) % 600), '架空テレコム利用料金'),
+      ...monthly('2026-01', '2026-11', 30, (_ym, i) => 1200 + ((i * 59) % 300), '架空テレコム利用料金'),
+    ];
+    const r = findRecurring(ts, none);
+    expect(r.monthly.map((i) => [i.label, i.count, i.variable, i.day])).toEqual([
+      ['架空テレコム利用料金', 47, true, 30],
+      ['架空テレコム利用料金', 11, true, 30],
+    ]);
+    const byId = new Map(ts.map((t) => [t.id, t]));
+    const amounts = (ids: string[]) => ids.map((id) => -byId.get(id)!.amount);
+    // 1行目は高いほう（以前の1件だけの月も、金額の近いこちらにつながる）、2行目は安いほう
+    expect(Math.min(...amounts(r.monthly[0].ids))).toBeGreaterThanOrEqual(2500);
+    expect(Math.max(...amounts(r.monthly[1].ids))).toBeLessThan(1500);
+    expect(r.monthly[0].ids.length + r.monthly[1].ids.length).toBe(ts.length - 1);
+    expect(r.stopped).toEqual([]);
+  });
+
+  it('以前は1件だった安いほうの回線は、金額の近い行につながる', () => {
+    const ts = [
+      latest,
+      ...monthly('2025-01', '2026-11', 30, (_ym, i) => 1200 + ((i * 59) % 300), '架空テレコム利用料金'),
+      ...monthly('2026-06', '2026-11', 30, (_ym, i) => 2500 + ((i * 173) % 600), '架空テレコム利用料金'),
+    ];
+    const r = findRecurring(ts, none);
+    expect(r.monthly.map((i) => i.count)).toEqual([6, 23]);
+  });
+
   it('前の名前とつなぐのは、次の月から同じ日ごろ・同じくらいの金額で始まったものが1つだけのとき', () => {
     const ts = [
       latest,
