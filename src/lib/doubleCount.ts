@@ -44,7 +44,12 @@ const norm = (list: string[]) => list.map(normalizeName);
  * 引き落としならではの言葉（A：これだけで候補にする）。
  * 「カード」だけでは候補にしない（「○○カード」という商品名などの買い物があるため）
  */
-const WITHDRAWAL_WORDS = norm(['引落', '引き落とし', 'ひきおとし', 'ヒキオトシ', '口座振替', '利用代金', 'クレジット', 'credit']);
+const WITHDRAWAL_WORDS = norm(['引落', '引き落とし', 'ひきおとし', 'ヒキオトシ', 'クレジット', 'credit']);
+/**
+ * カード以外の支払い（ガス・NHK・携帯料金など）にも使われる言葉（0.8.3）。
+ * これだけでは候補にせず、「○○カード」と書かれているか、金額がカードの利用額と一致したときだけ候補にする
+ */
+const WEAK_WITHDRAWAL_WORDS = norm(['口座振替', '利用代金']);
 /** 「カード」を表す言葉（カードの名前と結び付いたときだけ手がかりにする） */
 const CARD_WORDS = norm(['カード', 'card']);
 /** 引き落としではないもの（ローン返済・デビットなど） */
@@ -118,10 +123,21 @@ export function isEcommerceText(s: string): boolean {
   return includesAny(normalizeName(s), EC_WORDS);
 }
 
-/** 内容が引き落としならではの言葉を含むか（A）。「カード」だけでは false */
-export function looksLikeWithdrawal(content: string): boolean {
+/**
+ * 内容が引き落としらしい言葉を含むか。「カード」だけでは false。
+ * strong：それだけで候補にしてよい言葉（引落など）。weak：口座振替・利用代金（カード以外にも使われる）
+ */
+export function withdrawalWord(content: string): 'strong' | 'weak' | undefined {
   const n = normalizeName(content);
-  return includesAny(n, WITHDRAWAL_WORDS) && !includesAny(n, NOT_WITHDRAWAL_WORDS);
+  if (includesAny(n, NOT_WITHDRAWAL_WORDS)) return undefined;
+  if (includesAny(n, WITHDRAWAL_WORDS)) return 'strong';
+  if (includesAny(n, WEAK_WITHDRAWAL_WORDS)) return 'weak';
+  return undefined;
+}
+
+/** 内容が引き落としらしい言葉を含むか（口座振替・利用代金も含む） */
+export function looksLikeWithdrawal(content: string): boolean {
+  return withdrawalWord(content) !== undefined;
 }
 
 /** 辞書でカード会社を見つける（見つからなければ undefined） */
@@ -312,7 +328,8 @@ export function findWithdrawals(transactions: Transaction[], excluded: Exclusion
     // 引き落とし口座は銀行らしい金融機関に限る（電子マネー・通販サイトなどの買い物を拾わない）
     if (!eligible(t, excluded) || !isBankInstitution(t.institution) || isCardInstitution(t.institution)) continue;
     if (dismissed.has(withdrawalKey(t.institution, t.content))) continue;
-    const keyword = looksLikeWithdrawal(t.content);
+    const word = withdrawalWord(t.content);
+    const keyword = word !== undefined;
     let card = nameCache.get(t.content);
     if (!nameCache.has(t.content)) nameCache.set(t.content, (card = cardByName(t.content, cards)));
     // 名前で特定できない、またはキーワードがない場合は、金額で裏付けをとる
@@ -327,8 +344,9 @@ export function findWithdrawals(transactions: Transaction[], excluded: Exclusion
         amountMatched = true;
       }
     }
-    // 引き落としならではの言葉がないものは、名前でカードが分かり、かつ「○○カード」と続けて書かれているか、金額が一致したときだけ候補にする
-    if (!keyword && !(card && (amountMatched || hasCardNamePhrase(t.content, card)))) continue;
+    // 引き落としならではの言葉（引落など）がないもの（口座振替・利用代金だけのものを含む）は、
+    // 名前でカードが分かり、かつ「○○カード」と続けて書かれているか、金額が一致したときだけ候補にする
+    if (word !== 'strong' && !(card && (amountMatched || hasCardNamePhrase(t.content, card)))) continue;
 
     const gkey = card ? `c|${card.institution}|${t.institution}` : `u|${t.institution}|${t.content}`;
     let g = groups.get(gkey);
