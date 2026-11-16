@@ -184,6 +184,33 @@ describe('カード引き落とし', () => {
     expect(g[0].items.map((i) => i.t.content)).toEqual(['ミドリ']);
   });
 
+  it('「口座振替」「利用代金」だけでは候補にしない（「○○カード」と書かれているか、金額が一致したときだけ）', () => {
+    const ts = [
+      tx({ date: '2025-09-10', amount: -1000, institution: '楽天カード', content: 'x' }),
+      tx({ date: '2025-09-12', amount: -8000, institution: 'dカード', content: 'x' }),
+      // カードと無関係な口座振替
+      tx({ date: '2025-10-05', amount: -4500, institution: BANK, content: '口座振替 トウキョウガス' }),
+      tx({ date: '2025-10-06', amount: -2200, institution: BANK, content: 'NHK 口座振替' }),
+      tx({ date: '2025-10-07', amount: -3300, institution: BANK, content: '電話利用代金' }),
+      // カード会社のグループ会社（別名「楽天」「ドコモ」に当たるが、カードの引き落としではない）
+      tx({ date: '2025-10-08', amount: -2980, institution: BANK, content: 'ラクテンモバイル 口座振替' }),
+      tx({ date: '2025-10-09', amount: -5000, institution: BANK, content: '口座振替 NTTドコモ' }),
+      // カードの引き落とし
+      tx({ date: '2025-10-27', amount: -1000, institution: BANK, content: '口座振替 ﾗｸﾃﾝｶｰﾄﾞ' }),
+      tx({ date: '2025-10-10', amount: -8000, institution: BANK, content: '口座振替 NTTドコモ' }),
+    ];
+    const g = findWithdrawals(ts, none, noKeys);
+    expect(g.map((x) => [x.card, x.items.map((i) => `${i.t.content} ${i.t.amount}`)])).toEqual([
+      ['dカード', ['口座振替 NTTドコモ -8000']],
+      ['楽天カード', ['口座振替 ﾗｸﾃﾝｶｰﾄﾞ -1000']],
+    ]);
+    // 引落・クレジットなどは、今までどおりそれだけで候補にする
+    expect(findWithdrawals([tx({ date: '2025-10-27', amount: -5000, institution: BANK, content: 'ナゾノ 口座引落' })], none, noKeys)).toHaveLength(1);
+    // 金額で特定するときは、口座振替も手がかりにする
+    const byAmount = findWithdrawals([...cardMonths(), tx({ date: '2025-10-10', amount: -50000, institution: BANK, content: '口座振替 ﾅｿﾞﾉｼｬ' })], none, noKeys);
+    expect(byAmount.map((x) => [x.card, x.identifiedBy])).toEqual([[CARD, 'amount']]);
+  });
+
   it('振替・除外済み・カード側・収入・「二重ではない」の明細は候補にしない', () => {
     const transfer = tx({ date: '2025-10-27', amount: -50000, institution: BANK, content: 'カード引き落とし ミドリカード', isTransfer: true });
     const excludedTx = tx({ date: '2025-11-27', amount: -1, institution: BANK, content: 'カード引き落とし ミドリカード' });
