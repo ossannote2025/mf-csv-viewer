@@ -142,27 +142,44 @@ function makeGroup(key: string, baseKey: string, txs: Transaction[]): Group {
 }
 
 /**
- * 同じ名前で毎月2回以上あるもの（例：同じ請求名の2つのサブスク）は、金額ごとに分ける（0.9.2）。
- * 金額が ±2% 以内のものを同じ支払いとみなす。光熱費（中項目でまとめたもの）は分けない
+ * 同じ名前で毎月2回以上あるもの（例：同じ請求名の2つのサブスク・家族2人分の携帯料金）は、支払いごとに分ける（0.9.2）。
+ * 光熱費（中項目でまとめたもの）は分けない。
+ *
+ * 0.9.4：金額が毎月変わるもの（通話料で変わる携帯料金など）も分けられるように、金額の近さ（±2%）ではなく、
+ * 新しい月から古い月へたどって分ける。いちばん新しい月の明細を金額の大きい順に「1本目・2本目…」とし、
+ * 前の月の明細は、件数が同じなら金額の大きい順に、少ないときは金額のいちばん近いものにつなぐ。
+ * 2本の金額が近く、月によって大小が入れ替わると混ざる（合計は合う。ユーザーが了承）
  */
 function splitByAmount(key: string, txs: Transaction[]): Group[] {
-  const months = new Map<string, number>();
-  for (const t of txs) months.set(t.ym, (months.get(t.ym) ?? 0) + 1);
-  const multi = [...months.values()].filter((c) => c > 1).length;
-  if (key.startsWith('u|') || multi <= months.size * 0.2) return [makeGroup(key, key, txs)];
-  const sorted = [...txs].sort((a, b) => b.amount - a.amount);
-  const clusters: Transaction[][] = [];
-  let base = 0;
-  for (const t of sorted) {
-    const amount = -t.amount;
-    if (clusters.length === 0 || amount > base * (1 + STABLE_RATIO)) {
-      clusters.push([]);
-      base = amount;
+  const byMonth = new Map<string, Transaction[]>();
+  for (const t of txs) byMonth.set(t.ym, [...(byMonth.get(t.ym) ?? []), t]);
+  const yms = [...byMonth.keys()].sort().reverse();
+  // 以前は月1件で、途中から2件になったものも分ける（直近12か月でも見る）
+  const multiRatio = (list: string[]) => list.filter((ym) => byMonth.get(ym)!.length > 1).length / list.length;
+  if (key.startsWith('u|') || Math.max(multiRatio(yms), multiRatio(yms.slice(0, 12))) <= 0.2) return [makeGroup(key, key, txs)];
+
+  const tracks: { txs: Transaction[]; amount: number }[] = [];
+  for (const ym of yms) {
+    const items = [...byMonth.get(ym)!].sort((a, b) => a.amount - b.amount);
+    if (items.length >= tracks.length) {
+      items.forEach((t, i) => {
+        if (!tracks[i]) tracks.push({ txs: [], amount: 0 });
+        tracks[i].txs.push(t);
+        tracks[i].amount = -t.amount;
+      });
+      continue;
     }
-    clusters[clusters.length - 1].push(t);
+    const free = new Set(tracks);
+    for (const t of items) {
+      let best: (typeof tracks)[number] | undefined;
+      for (const tr of free) if (!best || Math.abs(tr.amount + t.amount) < Math.abs(best.amount + t.amount)) best = tr;
+      free.delete(best!);
+      best!.txs.push(t);
+      best!.amount = -t.amount;
+    }
   }
-  if (clusters.length === 1) return [makeGroup(key, key, txs)];
-  return clusters.map((c, i) => makeGroup(`${key}#${i}`, key, c));
+  if (tracks.length === 1) return [makeGroup(key, key, txs)];
+  return tracks.map((tr, i) => makeGroup(`${key}#${i}`, key, tr.txs));
 }
 
 const dayDistance = (a: number, b: number) => {
