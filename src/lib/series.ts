@@ -47,6 +47,34 @@ export function monthlySeries(transactions: Iterable<Transaction>, excluded: Exc
   return out;
 }
 
+/** 今日の年月（'YYYY-MM'。端末の時刻で求める） */
+export function currentYm(now = new Date()): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export interface MonthlyAverage {
+  income: number;
+  expense: number;
+  balance: number;
+  /** 平均に使った月数 */
+  months: number;
+  /** 途中の今月を平均から外したか */
+  skippedCurrent: boolean;
+}
+
+/**
+ * 月平均。途中の今月（まだ終わっていない月）は、金額が少なく平均を下げるので外す（B8）。
+ * 今月しかないときは、今月で計算する。明細のない月（0円）は、本当に支出がなかった月かもしれないので数える
+ */
+export function monthlyAverage(points: MonthPoint[], nowYm = currentYm()): MonthlyAverage {
+  const done = points.filter((p) => p.ym !== nowYm);
+  const use = done.length > 0 ? done : points;
+  const n = use.length || 1;
+  const income = use.reduce((a, p) => a + p.income, 0);
+  const expense = use.reduce((a, p) => a + p.expense, 0);
+  return { income: income / n, expense: expense / n, balance: (income - expense) / n, months: use.length, skippedCurrent: use.length < points.length };
+}
+
 /**
  * カテゴリ × 月 の支出合計（正の数）。
  * key='middle' のときは parentLarge の大項目に属する中項目だけを対象にする。

@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from '../../components/Icons';
 import { Card } from '../../components/Page';
 import { PeriodSwipeArea } from '../../components/PeriodSwipeArea';
 import { formatYen } from '../../lib/format';
-import { change, monthlySeries, ymRange } from '../../lib/series';
+import { change, currentYm, monthlyAverage, monthlySeries, ymRange } from '../../lib/series';
 import { monthsWithData, transactionsOfYear, transactionsOfYearMonths, yearlyTotals } from '../../lib/yearly';
 import { expenseByCategory, totals } from '../../lib/aggregate';
 import { useAppStore } from '../../store/useAppStore';
@@ -44,6 +44,17 @@ export function YearReport() {
   const cmpLabel = partial ? '前年同期比' : '前年比';
 
   const months = useMemo(() => (year ? monthlySeries(transactions, excluded, ymRange(`${year}-01`, `${year}-12`)) : []), [transactions, excluded, year]);
+
+  // 月平均：データのある月で割る。途中の今月は外す（B8）
+  const { avg, nowCats } = useMemo(() => {
+    const withData = monthsWithData(transactions, year ?? '');
+    const avg = monthlyAverage(months.filter((m) => withData.has(m.ym.slice(5))));
+    const nowYm = currentYm();
+    const nowCats = new Map(
+      avg.skippedCurrent ? expenseByCategory(transactions.filter((t) => t.ym === nowYm), excluded).map((c) => [c.name, c.amount]) : [],
+    );
+    return { avg, nowCats };
+  }, [transactions, excluded, year, months]);
 
   if (!year || !cur) return null;
   const maxYearExpense = Math.max(...years.map((y) => Math.max(y.expense, y.income)), 1);
@@ -93,12 +104,12 @@ export function YearReport() {
             <tr>
               <th className="py-1.5 text-left text-sm font-normal text-muted">収入</th>
               <td className="py-1.5 text-right text-lg font-bold text-income">{formatYen(cur.income)}</td>
-              <td className="py-1.5 text-right text-sm">{formatYen(cur.income / cur.months)}</td>
+              <td className="py-1.5 text-right text-sm">{formatYen(avg.income)}</td>
             </tr>
             <tr>
               <th className="py-1.5 text-left text-sm font-normal text-muted">支出</th>
               <td className="py-1.5 text-right text-lg font-bold text-expense">{formatYen(cur.expense)}</td>
-              <td className="py-1.5 text-right text-sm">{formatYen(cur.expense / cur.months)}</td>
+              <td className="py-1.5 text-right text-sm">{formatYen(avg.expense)}</td>
             </tr>
             <tr className="border-t border-line">
               <th className="py-2 text-left text-sm font-bold">収支</th>
@@ -106,13 +117,14 @@ export function YearReport() {
                 <Amount value={cur.balance} />
               </td>
               <td className="py-2 text-right text-sm">
-                <Amount value={cur.balance / cur.months} />
+                <Amount value={avg.balance} />
               </td>
             </tr>
           </tbody>
         </table>
         <p className="mt-2 text-xs text-muted">
           データのある月：{cur.months}か月
+          {avg.skippedCurrent && `。月平均は、途中の今月を除いた${avg.months}か月で計算しています`}
           {partial && hasPrev && '。前年とは、データのある月と同じ月どうしで比べています（前年同期比）'}
         </p>
         {hasPrev && prev && (
@@ -151,7 +163,7 @@ export function YearReport() {
                       <span className="tabular shrink-0 text-sm">{formatYen(c.amount)}</span>
                     </span>
                     <span className="mt-0.5 flex justify-between text-[11px] text-muted">
-                      <span>{cur.expense > 0 ? `${Math.round((c.amount / cur.expense) * 1000) / 10}%` : ''}・月平均 {formatYen(c.amount / cur.months)}</span>
+                      <span>{cur.expense > 0 ? `${Math.round((c.amount / cur.expense) * 1000) / 10}%` : ''}・月平均 {formatYen((c.amount - (nowCats.get(c.name) ?? 0)) / (avg.months || 1))}</span>
                       {hasPrev && (
                         <span>
                           {cmpLabel} <ChangeText c={change(c.amount, c.last ?? 0)} kind="expense" showRatio={false} />
