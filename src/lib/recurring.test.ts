@@ -34,8 +34,9 @@ describe('findRecurring', () => {
       latest,
       ...monthly('2025-12', '2026-11', 10, 3278, '架空モバイル'),
       ...monthly('2026-10', '2026-11', 3, 500, '架空アプリ'),
-      ...monthly('2026-01', '2026-11', 5, 3000, '架空スーパー'),
-      ...monthly('2026-01', '2026-11', 20, 2500, '架空スーパー'),
+      // 月に2回・金額は毎回違う（同じ名前で金額ごとに分けても、続かない）
+      ...monthly('2026-01', '2026-11', 5, (_ym, i) => 3000 + i * 137, '架空スーパー'),
+      ...monthly('2026-01', '2026-11', 20, (_ym, i) => 2500 + i * 211, '架空スーパー'),
     ];
     const r = findRecurring(ts, none);
     expect(r.latestYm).toBe('2026-11');
@@ -123,6 +124,59 @@ describe('findRecurring', () => {
     // 月数が偶数でも、30日と2日を同じ日とみなす
     const even = ymRange('2026-01', '2026-10').map((ym, i) => tx(`${ym}-${i % 2 ? '30' : '02'}`, -1000, '架空クラウド', { large: '通信費' }));
     expect(findRecurring([latest, ...even], none).monthly.map((i) => i.label)).toEqual(['架空クラウド']);
+  });
+
+  it('自動車のうち、ガソリン・道路料金は外し、駐車場などは固定費にする', () => {
+    const ts = [
+      latest,
+      ...monthly('2026-01', '2026-11', 12, 2500, '架空石油 駅前SS', { large: '自動車', middle: 'ガソリン' }),
+      ...monthly('2026-01', '2026-11', 12, 1200, '架空高速道路', { large: '自動車', middle: '道路料金' }),
+      ...monthly('2026-01', '2026-11', 27, 15000, '架空パーキング 月極', { large: '自動車', middle: '駐車場' }),
+    ];
+    expect(findRecurring(ts, none).monthly.map((i) => i.label)).toEqual(['架空パーキング 月極']);
+  });
+
+  it('光熱費は中項目でまとめ、会社名の書き方が変わっても続けて数える', () => {
+    const ts = [
+      latest,
+      ...monthly('2025-11', '2026-07', 20, (_ym, i) => 4000 + (i % 3) * 900, 'ｶｸｳ ｶﾞｽ ｶﾞｽﾘﾖｳｷﾝ', { large: '水道・光熱費', middle: 'ガス・灯油代' }),
+      ...monthly('2026-08', '2026-11', 21, (_ym, i) => 4200 + i * 300, '架空ガス', { large: '水道・光熱費', middle: 'ガス・灯油代' }),
+    ];
+    const r = findRecurring(ts, none);
+    expect(r.monthly.map((i) => [i.label, i.count, i.previousLabel])).toEqual([['架空ガス', 13, 'ｶｸｳ ｶﾞｽ ｶﾞｽﾘﾖｳｷﾝ']]);
+    expect(r.stopped).toEqual([]);
+  });
+
+  it('同じ名前で毎月2回ある支払いは金額ごとに分け、前の名前とつなぐ', () => {
+    const ts = [
+      latest,
+      ...monthly('2025-11', '2026-08', 7, 250, '架空クラウド ストレージ'),
+      ...monthly('2025-11', '2026-08', 15, 1280, '架空動画 プレミアム'),
+      // 9月から、2つとも同じ請求名に変わった
+      ...monthly('2026-09', '2026-11', 7, 250, '架空ストア ジャパン'),
+      ...monthly('2026-09', '2026-11', 15, 1280, '架空ストア ジャパン'),
+    ];
+    const r = findRecurring(ts, none);
+    expect(r.monthly.map((i) => [i.label, i.amount, i.count, i.previousLabel])).toEqual([
+      ['架空ストア ジャパン', 1280, 13, '架空動画 プレミアム'],
+      ['架空ストア ジャパン', 250, 13, '架空クラウド ストレージ'],
+    ]);
+    expect(r.stopped).toEqual([]);
+    expect(r.monthlyTotal).toBe(1530);
+  });
+
+  it('前の名前とつなぐのは、次の月から同じ日ごろ・同じくらいの金額で始まったものが1つだけのとき', () => {
+    const ts = [
+      latest,
+      ...monthly('2025-11', '2026-08', 7, 980, '架空音楽'),
+      // 日が違う・金額が違うものは、つながない
+      ...monthly('2026-09', '2026-11', 22, 980, '架空ニュース'),
+      ...monthly('2026-09', '2026-11', 8, 3000, '架空学習'),
+    ];
+    const r = findRecurring(ts, none);
+    expect(r.monthly.map((i) => i.label).sort()).toEqual(['架空ニュース', '架空学習']);
+    expect(r.monthly.every((i) => i.previousLabel === undefined)).toBe(true);
+    expect(r.stopped.map((i) => i.label)).toEqual(['架空音楽']);
   });
 
   it('収入・振替・計算対象外・除外した明細は使わない', () => {
