@@ -12,6 +12,11 @@ export interface TransactionFilter {
   amountMin?: number;
   amountMax?: number;
   showExcluded: boolean;
+  /**
+   * 決まった明細だけを出す（固定費の行から開いたとき。0.9.3）。名前の変わった明細・金額で分けた片方だけも正しく出すため。
+   * 明細タブの上に label を帯で出し、✕で解除する
+   */
+  pinned?: { label: string; ids: string[] };
 }
 
 export const EMPTY_FILTER: TransactionFilter = {
@@ -55,7 +60,9 @@ export function applyFilter(transactions: Transaction[], f: TransactionFilter, e
   const large = f.large.length ? new Set(f.large) : null;
   const middle = f.middle.length ? new Set(f.middle) : null;
   const inst = f.institutions.length ? new Set(f.institutions) : null;
+  const pinned = f.pinned ? new Set(f.pinned.ids) : null;
   return transactions.filter((t) => {
+    if (pinned && !pinned.has(t.id)) return false;
     if (!f.showExcluded && excluded.has(t.id)) return false;
     if (f.dateFrom && t.date < f.dateFrom) return false;
     if (f.dateTo && t.date > f.dateTo) return false;
