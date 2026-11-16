@@ -18,7 +18,7 @@ export function RecurringView() {
       <Card>
         <p className="text-sm">固定費・定期的な支払いは見つかりませんでした。</p>
         <p className="mt-2 text-xs text-muted">
-          同じ内容の支出が{MIN_MONTHLY_RUN}か月以上続けて毎月同じ日ごろにあるもの、毎年・数か月ごとに同じくらいの金額で続いているものを表示します（食費・交通費などの大項目は除く）。{MIN_MONTHLY_RUN}
+          同じ内容の支出が{MIN_MONTHLY_RUN}か月以上続けて毎月同じ日ごろにあるもの、毎年・数か月ごとに同じくらいの金額で続いているものを表示します（食費・交通費・ガソリンなどは除く）。{MIN_MONTHLY_RUN}
           か月分以上のデータを取り込むと表示されます。
         </p>
       </Card>
@@ -35,7 +35,7 @@ export function RecurringView() {
         </p>
         <p className="tabular mt-1 text-sm">年間にすると {formatYen(r.monthlyTotal * 12)}</p>
         <p className="mt-3 text-xs text-muted">
-          {activeCount}件・{formatYm(r.latestYm)}までのデータから、同じ内容の支出が毎月同じ日ごろ・定期的に出ているものを自動で見つけています（食費・交通費などの大項目は除く）。固定費ではないものが含まれることがあります。
+          {activeCount}件・{formatYm(r.latestYm)}までのデータから、同じ内容の支出が毎月同じ日ごろ・定期的に出ているものを自動で見つけています（食費・交通費・ガソリンなどは除く）。固定費ではないものが含まれることがあります。
         </p>
       </Card>
 

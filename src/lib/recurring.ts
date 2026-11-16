@@ -27,6 +27,12 @@ const DAY_MATCH_RATIO = 0.8;
  * たまたま毎月同じ店で食事した・同じ電車に乗った・ATM の手数料がかかった、などを拾わないため
  */
 export const NON_FIXED_CATEGORIES = new Set(['食費', '日用品', '交通費', '衣服・美容', '交際費', '現金・カード', '特別な支出']);
+/**
+ * 固定費の候補にしない「大項目/中項目」（0.9.2）。使った分だけかかるもの。
+ * 毎月同じころに給油すると固定費に出たとのユーザーの報告で決定（洗車もガソリンに入れているとのこと）。
+ * 同じ大項目の駐車場・自動車保険・ローンなどは固定費なので、大項目ごとは外さない
+ */
+export const NON_FIXED_MIDDLE_CATEGORIES = new Set(['自動車/ガソリン', '自動車/道路料金']);
 /** 数か月ごとの支払いとみなす間隔 */
 const PERIODIC_INTERVALS = [2, 3, 4, 6, 12];
 
@@ -206,7 +212,7 @@ export function findRecurring(transactions: Iterable<Transaction>, excluded: Exc
   for (const t of transactions) {
     if (t.ym > latestYm) latestYm = t.ym;
     if (t.amount >= 0 || t.isTransfer || !t.isTarget || excluded.has(t.id)) continue;
-    if (NON_FIXED_CATEGORIES.has(t.large)) continue;
+    if (NON_FIXED_CATEGORIES.has(t.large) || NON_FIXED_MIDDLE_CATEGORIES.has(`${t.large}/${t.middle}`)) continue;
     const key = recurringKey(t.content);
     if (key.length < 2) continue;
     let g = groups.get(key);

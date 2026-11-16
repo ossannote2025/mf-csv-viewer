@@ -125,6 +125,16 @@ describe('findRecurring', () => {
     expect(findRecurring([latest, ...even], none).monthly.map((i) => i.label)).toEqual(['架空クラウド']);
   });
 
+  it('自動車のうち、ガソリン・道路料金は外し、駐車場などは固定費にする', () => {
+    const ts = [
+      latest,
+      ...monthly('2026-01', '2026-11', 12, 2500, '架空石油 駅前SS', { large: '自動車', middle: 'ガソリン' }),
+      ...monthly('2026-01', '2026-11', 12, 1200, '架空高速道路', { large: '自動車', middle: '道路料金' }),
+      ...monthly('2026-01', '2026-11', 27, 15000, '架空パーキング 月極', { large: '自動車', middle: '駐車場' }),
+    ];
+    expect(findRecurring(ts, none).monthly.map((i) => i.label)).toEqual(['架空パーキング 月極']);
+  });
+
   it('収入・振替・計算対象外・除外した明細は使わない', () => {
     const excludedTs = monthly('2026-01', '2026-11', 1, 1000, '架空除外');
     const ts = [
