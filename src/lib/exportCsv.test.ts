@@ -42,6 +42,24 @@ describe('toCsv', () => {
     expect(r.transactions[0].content).toBe('架空スーパー, "本店"');
   });
 
+  it('取り込み直しても、記号で始まる内容・メモが変わらない', () => {
+    const values = ['=1+2', '+81 架空商店', '-割引', '@架空ストア', "'=もとから引用符", "''-二重", "'ふつう", '架空スーパー'];
+    const list = values.map((v, i) => ({ ...base, id: `T${i}`, content: v, memo: v, institution: v, large: v, middle: v }));
+    const r = parseMfCsv(toCsv(list, new Map(), []).replace(/^\uFEFF/, ''), 'export.csv');
+    expect(r.ownExport).toBe(true);
+    for (const key of ['content', 'memo', 'institution', 'large', 'middle'] as const) {
+      expect(r.transactions.map((t) => t[key])).toEqual(values);
+    }
+    // もう一度書き出しても同じ CSV になる
+    expect(toCsv(r.transactions, new Map(), [])).toBe(toCsv(list, new Map(), []));
+  });
+
+  it("マネーフォワードの CSV（「除外ルール」列がない）では、先頭の ' を外さない", () => {
+    const csv = ['"計算対象","日付","内容","金額（円）","保有金融機関","大項目","中項目","メモ","振替","ID"', `"1","2025/08/01","'=架空","-100","架空カード","食費","食料品","'-メモ","0","M1"`].join('\n');
+    const r = parseMfCsv(csv, 'mf.csv');
+    expect(r.transactions[0]).toMatchObject({ content: "'=架空", memo: "'-メモ" });
+  });
+
   it('ファイル名', () => {
     expect(exportFileName('mf-export', new Date(2025, 10, 5, 9, 7))).toBe('mf-export-20251105-0907.csv');
   });

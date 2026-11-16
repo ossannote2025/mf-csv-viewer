@@ -5,9 +5,11 @@ const HEADER = ['計算対象', '日付', '内容', '金額（円）', '保有�
 /**
  * Excelで数式として解釈されないよう、= + - @ などで始まる文字列の先頭に ' を付ける
  * （CSVインジェクション対策）。金額などの数値はそのまま。
+ * 取り込み直すときは csvParser.ts の unsafeText が外す。もとから ' ＋ 記号で始まる文字列にも付けるのは、
+ * 取り込み直したときに「付けた ' 」と見分けられるようにするため。
  */
 function safeText(v: string): string {
-  return /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+  return /^'*[=+\-@\t\r]/.test(v) ? `'${v}` : v;
 }
 
 function quote(v: string | number): string {

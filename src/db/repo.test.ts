@@ -156,6 +156,28 @@ describe('復元', () => {
     expect(d.transactions.map((t) => t.id).sort()).toEqual(['a', 'b', 'old']);
     expect(d.transactions.find((t) => t.id === 'a')!.date).toBe('2025-08-01');
   });
+
+  it('マージ：同じバックアップを繰り返し復元しても、取り込み履歴は増えない', async () => {
+    await saveImported([tx('old', '2024-01-01')], { fileName: 'f', importedAt: 1, rowCount: 1, added: 1, updated: 0 });
+    const data = {
+      ...backup(['a']),
+      imports: [
+        { fileName: 'f', importedAt: 1, rowCount: 1, added: 1, updated: 0 },
+        { fileName: 'g', importedAt: 1, rowCount: 2, added: 2, updated: 0 },
+        { fileName: 'f', importedAt: 2, rowCount: 3, added: 3, updated: 0 },
+      ],
+    };
+    await restoreBackup(data, 'merge');
+    await restoreBackup(data, 'merge');
+    const imports = (await loadAll()).imports.map((r) => `${r.fileName}@${r.importedAt}`).sort();
+    expect(imports).toEqual(['f@1', 'f@2', 'g@1']);
+  });
+
+  it('置き換え：取り込み履歴はバックアップの内容になる', async () => {
+    await saveImported([tx('old', '2024-01-01')], { fileName: 'x', importedAt: 9, rowCount: 1, added: 1, updated: 0 });
+    await restoreBackup(backup(['a']), 'replace');
+    expect((await loadAll()).imports.map((r) => r.fileName)).toEqual(['f']);
+  });
 });
 
 describe('二重計上の候補', () => {
