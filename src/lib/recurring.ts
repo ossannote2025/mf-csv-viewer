@@ -146,8 +146,10 @@ function makeGroup(key: string, baseKey: string, txs: Transaction[]): Group {
  * 光熱費（中項目でまとめたもの）は分けない。
  *
  * 0.9.4：金額が毎月変わるもの（通話料で変わる携帯料金など）も分けられるように、金額の近さ（±2%）ではなく、
- * 新しい月から古い月へたどって分ける。いちばん新しい月の明細を金額の大きい順に「1本目・2本目…」とし、
- * 前の月の明細は、件数が同じなら金額の大きい順に、少ないときは金額のいちばん近いものにつなぐ。
+ * 新しい月から古い月へたどって、前の月の明細を「同じ支払い」につなぐ。
+ * 0.9.5：0.9.4 は件数の同じ月を金額の順番でつないでいたため、途中で止まった支払いが残りの支払いに混ざり、
+ * 「最近止まったもの」に出なくなった。各月の明細を、金額（±30%）と日（±5日）の近いものから順につなぎ、
+ * つなぐ先のない明細は別の支払いとして数える。
  * 2本の金額が近く、月によって大小が入れ替わると混ざる（合計は合う。ユーザーが了承）
  */
 function splitByAmount(key: string, txs: Transaction[]): Group[] {
@@ -158,29 +160,49 @@ function splitByAmount(key: string, txs: Transaction[]): Group[] {
   const multiRatio = (list: string[]) => list.filter((ym) => byMonth.get(ym)!.length > 1).length / list.length;
   if (key.startsWith('u|') || Math.max(multiRatio(yms), multiRatio(yms.slice(0, 12))) <= 0.2) return [makeGroup(key, key, txs)];
 
-  const tracks: { txs: Transaction[]; amount: number }[] = [];
+  const tracks: Track[] = [];
   for (const ym of yms) {
-    const items = [...byMonth.get(ym)!].sort((a, b) => a.amount - b.amount);
-    if (items.length >= tracks.length) {
-      items.forEach((t, i) => {
-        if (!tracks[i]) tracks.push({ txs: [], amount: 0 });
-        tracks[i].txs.push(t);
-        tracks[i].amount = -t.amount;
-      });
-      continue;
-    }
-    const free = new Set(tracks);
+    const items = byMonth.get(ym)!;
+    const pairs: { t: Transaction; tr: Track; diff: number }[] = [];
     for (const t of items) {
-      let best: (typeof tracks)[number] | undefined;
-      for (const tr of free) if (!best || Math.abs(tr.amount + t.amount) < Math.abs(best.amount + t.amount)) best = tr;
-      free.delete(best!);
-      best!.txs.push(t);
-      best!.amount = -t.amount;
+      for (const tr of tracks) {
+        const diff = amountDiff(-t.amount, tr.amount);
+        if (diff <= TRACK_AMOUNT_RATIO && dayDistance(day(t), tr.day) <= DAY_TOLERANCE) pairs.push({ t, tr, diff });
+      }
+    }
+    pairs.sort((x, y) => x.diff - y.diff || dayDistance(day(x.t), x.tr.day) - dayDistance(day(y.t), y.tr.day));
+    const usedT = new Set<Transaction>();
+    const usedTr = new Set<Track>();
+    const attach = (t: Transaction, tr: Track) => {
+      usedT.add(t);
+      usedTr.add(tr);
+      tr.txs.push(t);
+      tr.amount = -t.amount;
+      tr.day = day(t);
+    };
+    for (const { t, tr } of pairs) if (!usedT.has(t) && !usedTr.has(tr)) attach(t, tr);
+    // つなぐ先のない明細は、別の支払い（金額の大きい順に並べる）
+    for (const t of [...items].sort((x, y) => x.amount - y.amount)) {
+      if (usedT.has(t)) continue;
+      const tr: Track = { txs: [], amount: 0, day: 0 };
+      tracks.push(tr);
+      attach(t, tr);
     }
   }
   if (tracks.length === 1) return [makeGroup(key, key, txs)];
   return tracks.map((tr, i) => makeGroup(`${key}#${i}`, key, tr.txs));
 }
+
+interface Track {
+  txs: Transaction[];
+  /** つないだ明細のうち、いちばん古い月の金額（正の数）と日 */
+  amount: number;
+  day: number;
+}
+/** 同じ支払いとしてつなぐ、前の月との金額の違い（大きいほうに対する割合。0.9.5） */
+const TRACK_AMOUNT_RATIO = 0.3;
+const day = (t: Transaction) => Number(t.date.slice(8, 10));
+const amountDiff = (a: number, b: number) => Math.abs(a - b) / Math.max(a, b, 1);
 
 const dayDistance = (a: number, b: number) => {
   const diff = Math.abs(a - b);
