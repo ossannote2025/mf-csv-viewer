@@ -33,6 +33,11 @@ export const NON_FIXED_CATEGORIES = new Set(['食費', '日用品', '交通費',
  * 同じ大項目の駐車場・自動車保険・ローンなどは固定費なので、大項目ごとは外さない
  */
 export const NON_FIXED_MIDDLE_CATEGORIES = new Set(['自動車/ガソリン', '自動車/道路料金']);
+/**
+ * これより少ない金額（1回あたり）のものは固定費に出さない（0.9.5）。
+ * 預金の利息から毎月引かれる「国税」「地方税」（数円〜数十円）が固定費に出たとのユーザーの報告で決定
+ */
+export const MIN_RECURRING_AMOUNT = 100;
 /** 数か月ごとの支払いとみなす間隔 */
 const PERIODIC_INTERVALS = [2, 3, 4, 6, 12];
 
@@ -391,7 +396,7 @@ export function findRecurring(transactions: Iterable<Transaction>, excluded: Exc
   for (const g of groups) {
     const occ = [...g.months.keys()].sort();
     const item = asMonthly(g, occ, latestYm) ?? asPeriodic(g, occ);
-    if (!item) continue;
+    if (!item || item.amount < MIN_RECURRING_AMOUNT) continue;
     // 次に出るはずの月の翌月を過ぎても出ていなければ「止まった」（今月は途中のことがあるので1か月待つ）
     const gap = monthDiff(item.lastYm, latestYm);
     if (gap > item.intervalMonths) {

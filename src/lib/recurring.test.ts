@@ -258,6 +258,18 @@ describe('findRecurring', () => {
     expect(r.stopped[0].ids).toHaveLength(juku.length);
   });
 
+  it('1回あたり100円未満のもの（預金の利息から引かれる税金など）は出さない（0.9.5）', () => {
+    const ts = [
+      latest,
+      ...monthly('2025-01', '2026-11', 18, (_ym, i) => 10 + (i % 5) * 4, '国税', { large: '税・社会保障', middle: '所得税・住民税' }),
+      ...monthly('2025-01', '2026-11', 18, (_ym, i) => 3 + (i % 3), '地方税', { large: '税・社会保障', middle: '所得税・住民税' }),
+      ...monthly('2025-01', '2026-11', 1, 100, '架空アプリ'),
+    ];
+    const r = findRecurring(ts, none);
+    expect(r.monthly.map((i) => i.label)).toEqual(['架空アプリ']);
+    expect(r.stopped).toEqual([]);
+  });
+
   it('前の名前とつなぐのは、次の月から同じ日ごろ・同じくらいの金額で始まったものが1つだけのとき', () => {
     const ts = [
       latest,
