@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { DismissedCandidate, ExclusionRule, ImportRecord, Transaction } from '../lib/types';
+import type { DismissedCandidate, ExclusionRule, ImportRecord, RecurringChoice, Transaction } from '../lib/types';
 
 export interface MetaEntry {
   key: 'lastImportAt' | 'lastBackupAt';
@@ -13,6 +13,8 @@ export class MfDatabase extends Dexie {
   meta!: EntityTable<MetaEntry, 'key'>;
   /** 「二重ではない」とした二重計上の候補（version 2 で追加） */
   dismissed!: EntityTable<DismissedCandidate, 'key'>;
+  /** 固定費の候補を固定費に入れるかの選択（version 3 で追加） */
+  recurringChoices!: EntityTable<RecurringChoice, 'key'>;
 
   constructor(name = 'mf-csv-viewer') {
     super(name);
@@ -27,6 +29,10 @@ export class MfDatabase extends Dexie {
     // version 2：二重計上の候補の「二重ではない」の記録を追加（既存のテーブルはそのまま）
     this.version(2).stores({
       dismissed: 'key',
+    });
+    // version 3：固定費の候補の選択を追加（0.10.0。既存のテーブルはそのまま）
+    this.version(3).stores({
+      recurringChoices: 'key',
     });
   }
 }

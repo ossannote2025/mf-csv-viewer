@@ -1,13 +1,14 @@
 import { checkConditions } from './rules';
-import type { DismissedCandidate, ExclusionRule, ImportRecord, Transaction } from './types';
+import type { DismissedCandidate, ExclusionRule, ImportRecord, RecurringChoice, Transaction } from './types';
 
 export const BACKUP_APP = 'mf-csv-viewer';
 /**
  * バックアップJSONの形式バージョン。形式を変えたら上げ、古い形式の変換を parseBackup に追加する
  * - 1：明細・除外ルール・取り込み履歴・メタ情報
  * - 2：「二重ではない」とした二重計上の候補（dismissed）を追加。形式1は dismissed なしとして読む
+ * - 3：固定費の候補の選択（recurringChoices）を追加（0.10.0）。形式1・2は選択なしとして読む
  */
-export const BACKUP_FORMAT = 2;
+export const BACKUP_FORMAT = 3;
 
 export interface BackupData {
   app: typeof BACKUP_APP;
@@ -18,6 +19,7 @@ export interface BackupData {
   imports: ImportRecord[];
   meta: { lastImportAt?: number };
   dismissed: DismissedCandidate[];
+  recurringChoices: RecurringChoice[];
 }
 
 export function createBackup(
@@ -26,6 +28,7 @@ export function createBackup(
   imports: ImportRecord[],
   meta: { lastImportAt?: number },
   dismissed: DismissedCandidate[],
+  recurringChoices: RecurringChoice[],
   now = Date.now(),
 ): BackupData {
   return {
@@ -37,6 +40,7 @@ export function createBackup(
     imports: imports.map(({ seq: _seq, ...rest }) => (void _seq, rest)),
     meta: { lastImportAt: meta.lastImportAt },
     dismissed,
+    recurringChoices,
   };
 }
 
@@ -154,6 +158,18 @@ function checkDismissed(list: unknown): DismissedCandidate[] {
     }));
 }
 
+function checkRecurringChoices(list: unknown): RecurringChoice[] {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((c): c is Record<string, unknown> => isObj(c) && isStr(c.key) && c.key !== '' && (c.choice === 'fixed' || c.choice === 'notFixed'))
+    .map((c): RecurringChoice => ({
+      key: c.key as string,
+      choice: c.choice as RecurringChoice['choice'],
+      label: isStr(c.label) ? c.label : '',
+      decidedAt: isNum(c.decidedAt) ? c.decidedAt : 0,
+    }));
+}
+
 /** バックアップJSONの文字列を検証して読み込む。問題があれば日本語のメッセージで BackupError を投げる */
 export function parseBackup(text: string): BackupData {
   let raw: unknown;
@@ -190,6 +206,8 @@ export function parseBackup(text: string): BackupData {
     meta: { lastImportAt: isNum(meta.lastImportAt) ? meta.lastImportAt : undefined },
     // 形式1には無いので空になる
     dismissed: checkDismissed(raw.dismissed),
+    // 形式1・2には無いので空になる
+    recurringChoices: checkRecurringChoices(raw.recurringChoices),
   };
 }
 
