@@ -29,7 +29,7 @@ export interface RecurringPoint {
 export interface RecurringItem {
   /** 名前（`groupKey`）。固定費かどうかの選択はこのキーで保存する */
   key: string;
-  /** 直近の明細の内容 */
+  /** 直近の明細の内容（メモでまとめたものはメモ） */
   label: string;
   /** 直近の明細の支払い元・大項目 */
   institution: string;
@@ -57,7 +57,7 @@ export function recurringKey(content: string): string {
     .normalize('NFKC')
     .toLowerCase()
     .replace(/[\d\s\p{P}\p{S}]/gu, '')
-    .replace(/(年|月|日|分)+$/u, '');
+    .replace(/(年度|年|月|日|分)+$/u, '');
 }
 
 /**
@@ -67,9 +67,23 @@ export function recurringKey(content: string): string {
 const UTILITY_LARGE = '水道・光熱費';
 const GENERIC_MIDDLES = new Set(['光熱費', 'その他水道・光熱費', '未分類', 'その他']);
 
+/**
+ * メモのある明細は、内容ではなくメモでまとめる（0.10.1。ユーザーの提案）。
+ * 「セブン-イレブン 支払」のように1つの内容でいろいろな支払いをしていても、メモ（「自動車税」など）で分けられるようにするため。
+ * 記号・数字だけのメモは使わない
+ */
+const memoKey = (t: Transaction) => (t.memo ? recurringKey(t.memo) : '');
+
 export function groupKey(t: Transaction): string {
   if (t.large === UTILITY_LARGE && !GENERIC_MIDDLES.has(t.middle)) return `u|${t.middle}`;
-  return recurringKey(t.content);
+  const memo = memoKey(t);
+  return memo.length >= 2 ? memo : recurringKey(t.content);
+}
+
+/** 一覧に出す名前：メモでまとめたものはメモ、それ以外は内容 */
+function displayName(t: Transaction): string {
+  const usesMemo = !(t.large === UTILITY_LARGE && !GENERIC_MIDDLES.has(t.middle)) && memoKey(t).length >= 2;
+  return usesMemo ? t.memo : t.content;
 }
 
 const monthDiff = (a: string, b: string) => (Number(b.slice(0, 4)) - Number(a.slice(0, 4))) * 12 + Number(b.slice(5, 7)) - Number(a.slice(5, 7));
@@ -90,7 +104,7 @@ function toItem(key: string, txs: Transaction[], latestYm: string): RecurringIte
   const historyEnd = sinceLast < STOPPED_AFTER_MONTHS ? latestYm : lastYm;
   const base = {
     key,
-    label: last.content,
+    label: displayName(last),
     institution: last.institution,
     large: last.large,
     lastYm,
@@ -148,8 +162,8 @@ export interface RecurringCategory {
 export interface RecurringGroups {
   /** 固定費に入れたもの（止まっていないもの）を大項目ごとに。小計の大きい順 */
   fixed: RecurringCategory[];
-  /** 固定費に入れたもののうち、最近止まったもの（合計に入れない） */
-  fixedStopped: RecurringItem[];
+  /** 最近止まったもの（固定費に入れたものと未確認のもの。合計に入れない。0.10.1 で未確認のものも出すようにした） */
+  stopped: RecurringItem[];
   /** まだ選んでいない候補（止まっていないものだけ） */
   undecided: RecurringItem[];
   /** 固定費ではないとしたもの */
@@ -162,15 +176,16 @@ export interface RecurringGroups {
 export function groupByChoice(items: RecurringItem[], choices: RecurringChoice[]): RecurringGroups {
   const choiceOf = new Map(choices.map((c) => [c.key, c.choice]));
   const byLarge = new Map<string, RecurringItem[]>();
-  const g: RecurringGroups = { fixed: [], fixedStopped: [], undecided: [], notFixed: [], monthlyTotal: 0 };
+  const g: RecurringGroups = { fixed: [], stopped: [], undecided: [], notFixed: [], monthlyTotal: 0 };
   for (const item of items) {
     const choice = choiceOf.get(item.key);
     if (choice === 'notFixed') g.notFixed.push(item);
-    else if (choice === 'fixed') {
-      if (item.stopped) g.fixedStopped.push(item);
-      else byLarge.set(item.large, [...(byLarge.get(item.large) ?? []), item]);
-    } else if (!item.stopped) g.undecided.push(item);
+    else if (item.stopped) g.stopped.push(item);
+    else if (choice === 'fixed') byLarge.set(item.large, [...(byLarge.get(item.large) ?? []), item]);
+    else g.undecided.push(item);
   }
+  // 最近止まったものは、止まったのが新しい順
+  g.stopped.sort((a, b) => (a.lastYm < b.lastYm ? 1 : a.lastYm > b.lastYm ? -1 : b.monthlyCost - a.monthlyCost));
   g.fixed = [...byLarge.entries()]
     .map(([large, list]) => ({ large, items: list, monthlyTotal: list.reduce((a, i) => a + i.monthlyCost, 0) }))
     .sort((a, b) => b.monthlyTotal - a.monthlyTotal || a.large.localeCompare(b.large, 'ja'));

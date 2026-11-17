@@ -17,6 +17,7 @@ export function RecurringView() {
   const { latestYm, items } = useMemo(() => findRecurring(transactions, excluded), [transactions, excluded]);
   const g = useMemo(() => groupByChoice(items, choices), [items, choices]);
   const fixedCount = g.fixed.reduce((a, c) => a + c.items.length, 0);
+  const fixedKeys = useMemo(() => new Set(choices.filter((c) => c.choice === 'fixed').map((c) => c.key)), [choices]);
 
   if (items.length === 0) {
     return (
@@ -75,13 +76,15 @@ export function RecurringView() {
         </Card>
       )}
 
-      {g.fixedStopped.length > 0 && (
-        <Card title={`最近止まった固定費（${g.fixedStopped.length}件）`}>
-          <p className="-mt-1 mb-2 text-xs text-muted">最後の支払いから{STOPPED_AFTER_MONTHS}か月以上たったものです。上の合計には入れていません。</p>
+      {g.stopped.length > 0 && (
+        <Card title={`最近止まったもの（${g.stopped.length}件）`}>
+          <p className="-mt-1 mb-2 text-xs text-muted">
+            最後の支払いから{STOPPED_AFTER_MONTHS}か月以上たったものです。上の合計には入れていません。「入れない」にしたものは出しません。
+          </p>
           <ul className="-mx-2 divide-y divide-line">
-            {g.fixedStopped.map((item) => (
+            {g.stopped.map((item) => (
               <li key={item.key}>
-                <Row item={item} control={<ChoiceToggle item={item} checked />} />
+                <Row item={item} control={fixedKeys.has(item.key) ? <ChoiceToggle item={item} checked /> : <DecideButtons item={item} />} />
               </li>
             ))}
           </ul>
@@ -93,7 +96,7 @@ export function RecurringView() {
   );
 }
 
-const rulesText = `同じ名前の支出が直近12か月のうち${MIN_MONTHS}か月以上あるもの、2年続けて同じ月ごろにあるもの（年1回）を候補にしています（食費・日用品・交通費・ガソリンなどは除く）。月あたりの金額は12か月の合計÷12（年1回は1回分÷12）です。`;
+const rulesText = `同じ名前（メモのある明細はメモ）の支出が直近12か月のうち${MIN_MONTHS}か月以上あるもの、2年続けて同じ月ごろにあるもの（年1回）を候補にしています（食費・日用品・交通費・ガソリンなどは除く）。月あたりの金額は12か月の合計÷12（年1回は1回分÷12）です。`;
 
 function NotFixed({ items }: { items: RecurringItem[] }) {
   const [open, setOpen] = useState(false);

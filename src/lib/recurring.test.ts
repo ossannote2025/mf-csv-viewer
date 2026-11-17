@@ -113,6 +113,40 @@ describe('findRecurring', () => {
   });
 });
 
+describe('メモでまとめる（0.10.1）', () => {
+  const pay = (date: string, amount: number, memo: string, large = '税・社会保障') =>
+    tx(date, -amount, 'セブン-イレブン 支払', { memo, large, middle: 'その他', institution: '架空マネー' });
+
+  it('メモのある明細は、内容ではなくメモでまとめる（同じ店の支払いでも、メモが同じ年1回の税金を見つける）', () => {
+    const items = find([
+      latest,
+      pay('2024-05-20', 34500, '自動車税'),
+      pay('2025-05-18', 34500, '自動車税 2025年度'),
+      pay('2026-05-17', 34500, '自動車税'),
+      pay('2026-01-01', 40000, '架空ギフトカード', '通信費'),
+      pay('2026-09-07', 39999, '架空旅行の代金', '教養・教育'),
+      pay('2026-10-28', 25000, '', '通信費'),
+    ]);
+    expect(items.map((i) => [i.key, i.label, i.kind, i.count, i.yearlyAmount])).toEqual([['自動車税', '自動車税', 'yearly', 3, 34500]]);
+  });
+
+  it('メモのない明細は、今までどおり内容でまとめる。記号・数字だけのメモは使わない', () => {
+    const items = find([
+      latest,
+      ...monthly('2026-06', '2026-11', 10, 3000, '架空モバイル'),
+      tx('2026-08-10', -3000, '架空モバイル', { memo: '123' }),
+      tx('2026-09-10', -3000, '架空モバイル', { memo: '★' }),
+    ]);
+    expect(items.map((i) => [i.label, i.ids.length])).toEqual([['架空モバイル', 8]]);
+  });
+
+  it('光熱費は、メモがあっても中項目でまとめる', () => {
+    const gas = { large: '水道・光熱費', middle: 'ガス・灯油代' };
+    const items = find([latest, ...monthly('2026-06', '2026-11', 20, 5000, '架空ガス', { ...gas, memo: '検針' })]);
+    expect(items.map((i) => [i.key, i.label])).toEqual([['u|ガス・灯油代', '架空ガス']]);
+  });
+});
+
 describe('groupByChoice', () => {
   const ts = [
     latest,
@@ -126,10 +160,17 @@ describe('groupByChoice', () => {
   const items = findRecurring(ts, none).items;
   const c = (key: string, choice: RecurringChoice['choice']): RecurringChoice => ({ key, choice, label: key, decidedAt: 0 });
 
-  it('何も選んでいなければ、止まっていない候補はすべて未確認', () => {
+  it('何も選んでいなければ、止まっていない候補は未確認、止まったものは「最近止まったもの」（新しい順）', () => {
     const g = groupByChoice(items, []);
     expect(g.undecided.map((i) => i.label)).toEqual(['架空ゼミ', '架空モバイル', '架空光回線', '国税']);
-    expect([g.fixed, g.fixedStopped, g.notFixed, g.monthlyTotal]).toEqual([[], [], [], 0]);
+    expect(g.stopped.map((i) => i.label)).toEqual(['架空音楽', '架空止まった候補']);
+    expect([g.fixed, g.notFixed, g.monthlyTotal]).toEqual([[], [], 0]);
+  });
+
+  it('「入れない」にしたものは、止まっても「最近止まったもの」に出さない', () => {
+    const g = groupByChoice(items, [c('架空止まった候補', 'notFixed')]);
+    expect(g.stopped.map((i) => i.label)).toEqual(['架空音楽']);
+    expect(g.notFixed.map((i) => i.label)).toEqual(['架空止まった候補']);
   });
 
   it('固定費に入れたものを大項目ごとにまとめ、止まっていないものだけ合計する', () => {
@@ -139,7 +180,7 @@ describe('groupByChoice', () => {
       ['通信費', ['架空モバイル', '架空光回線'], 4200],
     ]);
     expect(g.monthlyTotal).toBe(16200);
-    expect(g.fixedStopped.map((i) => i.label)).toEqual(['架空音楽']);
+    expect(g.stopped.map((i) => i.label)).toEqual(['架空音楽', '架空止まった候補']);
     expect(g.notFixed.map((i) => i.label)).toEqual(['国税']);
     expect(g.undecided).toEqual([]);
   });
