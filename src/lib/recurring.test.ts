@@ -34,9 +34,11 @@ describe('findRecurring', () => {
       latest,
       ...monthly('2025-12', '2026-11', 10, 3278, '架空モバイル'),
       ...monthly('2026-10', '2026-11', 3, 500, '架空アプリ'),
-      // 月に2回・金額は毎回違う（同じ名前で金額ごとに分けても、続かない）
-      ...monthly('2026-01', '2026-11', 5, (_ym, i) => 3000 + i * 137, '架空スーパー'),
-      ...monthly('2026-01', '2026-11', 20, (_ym, i) => 2500 + i * 211, '架空スーパー'),
+      // 月に2回・日も金額も毎回違う（同じ名前で支払いごとに分けても、日がそろわない）
+      ...ymRange('2026-01', '2026-11').flatMap((ym, i) => [
+        tx(`${ym}-${String(1 + ((i * 7) % 14)).padStart(2, '0')}`, -(3000 + i * 137), '架空スーパー'),
+        tx(`${ym}-${String(15 + ((i * 11) % 14)).padStart(2, '0')}`, -(2500 + i * 211), '架空スーパー'),
+      ]),
     ];
     const r = findRecurring(ts, none);
     expect(r.latestYm).toBe('2026-11');
@@ -202,6 +204,88 @@ describe('findRecurring', () => {
     ];
     const r = findRecurring(ts, none);
     expect(r.monthly.map((i) => i.count)).toEqual([6, 23]);
+  });
+
+  it('同じ名前のいくつかの支払いのうち、途中で止まったものは「最近止まったもの」に出る（0.9.5）', () => {
+    const ts = [
+      latest,
+      ...monthly('2024-01', '2026-11', 3, 130, '架空ストア 請求'),
+      ...monthly('2024-01', '2026-11', 3, 1280, '架空ストア 請求'),
+      ...monthly('2024-01', '2026-06', 3, 480, '架空ストア 請求'),
+      ...monthly('2024-01', '2026-03', 12, 2900, '架空ストア 請求'),
+    ];
+    const r = findRecurring(ts, none);
+    expect(r.monthly.map((i) => [i.amount, i.variable, i.count])).toEqual([
+      [1280, false, 35],
+      [130, false, 35],
+    ]);
+    expect(r.stopped.map((i) => [i.amount, i.lastYm, i.day])).toEqual([
+      [480, '2026-06', 3],
+      [2900, '2026-03', 12],
+    ]);
+    // 行ごとの明細に、ほかの支払いが混ざらない
+    const byId = new Map(ts.map((t) => [t.id, t]));
+    for (const item of [...r.monthly, ...r.stopped]) {
+      expect(new Set(item.ids.map((id) => -byId.get(id)!.amount))).toEqual(new Set([item.amount]));
+    }
+  });
+
+  it('携帯料金の2回線のうち1回線を解約したら、その回線は「最近止まったもの」に出る（0.9.5）', () => {
+    const ts = [
+      latest,
+      ...monthly('2025-01', '2026-11', 30, (_ym, i) => 2500 + ((i * 173) % 600), '架空テレコム利用料金'),
+      ...monthly('2025-01', '2026-07', 30, (_ym, i) => 1200 + ((i * 59) % 300), '架空テレコム利用料金'),
+    ];
+    const r = findRecurring(ts, none);
+    expect(r.monthly.map((i) => [i.count, i.variable])).toEqual([[23, true]]);
+    expect(r.stopped.map((i) => [i.lastYm, i.count])).toEqual([['2026-07', 19]]);
+    const byId = new Map(ts.map((t) => [t.id, t]));
+    expect(Math.max(...r.stopped[0].ids.map((id) => -byId.get(id)!.amount))).toBeLessThan(1500);
+  });
+
+  it('季節講習の月だけ2件ある、金額の毎月変わる支払い（塾など）は、分けずに1行で見る（0.9.5）', () => {
+    // 毎月5日・金額は毎月大きく変わる。12月（と直近の夏）は26日にもう1件。2026-01 で止まった
+    const juku = ymRange('2022-04', '2026-01').flatMap((ym, i) => {
+      const r = [tx(`${ym}-05`, -(36000 + ((i * 37919) % 106000)), '架空ゼミ)ジユクヒヨウ', { large: '教養・教育', middle: '塾' })];
+      if (ym.slice(5) === '12' || ym === '2025-07' || ym === '2025-08') {
+        r.push(tx(`${ym}-26`, -(80000 + ((i * 7717) % 40000)), '架空ゼミ)ジユクヒヨウ', { large: '教養・教育', middle: '塾' }));
+      }
+      return r;
+    });
+    const r = findRecurring([latest, ...juku], none);
+    expect(r.monthly).toEqual([]);
+    expect(r.stopped.map((i) => [i.label, i.intervalMonths, i.lastYm, i.variable])).toEqual([['架空ゼミ)ジユクヒヨウ', 1, '2026-01', true]]);
+    expect(r.stopped[0].ids).toHaveLength(juku.length);
+  });
+
+  it('1回あたり100円未満のもの（預金の利息から引かれる税金など）は出さない（0.9.5）', () => {
+    const ts = [
+      latest,
+      ...monthly('2025-01', '2026-11', 18, (_ym, i) => 10 + (i % 5) * 4, '国税', { large: '税・社会保障', middle: '所得税・住民税' }),
+      ...monthly('2025-01', '2026-11', 18, (_ym, i) => 3 + (i % 3), '地方税', { large: '税・社会保障', middle: '所得税・住民税' }),
+      ...monthly('2025-01', '2026-11', 1, 100, '架空アプリ'),
+    ];
+    const r = findRecurring(ts, none);
+    expect(r.monthly.map((i) => i.label)).toEqual(['架空アプリ']);
+    expect(r.stopped).toEqual([]);
+  });
+
+  it('2〜6か月ごとのものは金額が ±30% まで変わっても出す。毎年のものは ±10% のまま（0.9.5）', () => {
+    const lesson = { large: '教養・教育', middle: '習いごと' };
+    const ts = [
+      latest,
+      // 2か月ごと・コースで金額が変わる。2026-06 で止まった
+      ...[['2025-04', 15400], ['2025-06', 15400], ['2025-08', 15400], ['2025-10', 15400], ['2025-12', 15400], ['2026-02', 15400], ['2026-04', 18700], ['2026-06', 17000]].map(([ym, a]) =>
+        tx(`${ym}-06`, -a, '架空(スイミング', lesson),
+      ),
+      // 毎年・金額が ±10% を超えて変わる（同じ月の通販など）は出さない
+      tx('2024-07-10', -5000, '架空ショップ', { large: '趣味・娯楽', middle: '本' }),
+      tx('2025-07-10', -6200, '架空ショップ', { large: '趣味・娯楽', middle: '本' }),
+      tx('2026-07-10', -5000, '架空ショップ', { large: '趣味・娯楽', middle: '本' }),
+    ];
+    const r = findRecurring(ts, none);
+    expect(r.stopped.map((i) => [i.label, i.intervalMonths, i.amount, i.lastYm, i.count])).toEqual([['架空(スイミング', 2, 17000, '2026-06', 8]]);
+    expect(r.periodic).toEqual([]);
   });
 
   it('前の名前とつなぐのは、次の月から同じ日ごろ・同じくらいの金額で始まったものが1つだけのとき', () => {
