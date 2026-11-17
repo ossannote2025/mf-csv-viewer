@@ -1,4 +1,5 @@
 import { shiftYm } from './date';
+import { formatYen } from './format';
 import { ymRange } from './series';
 import type { ExclusionMap, RecurringChoice, Transaction } from './types';
 
@@ -27,9 +28,9 @@ export interface RecurringPoint {
 }
 
 export interface RecurringItem {
-  /** 名前（`groupKey`）。固定費かどうかの選択はこのキーで保存する */
+  /** 名前（`groupKey`。同じ金額の年1回は「名前|金額」）。固定費かどうかの選択はこのキーで保存する */
   key: string;
-  /** 直近の明細の内容（メモでまとめたものはメモ） */
+  /** 直近の明細の内容（同じ金額の年1回は「内容（¥34,500）」） */
   label: string;
   /** 直近の明細の支払い元・大項目 */
   institution: string;
@@ -67,23 +68,9 @@ export function recurringKey(content: string): string {
 const UTILITY_LARGE = '水道・光熱費';
 const GENERIC_MIDDLES = new Set(['光熱費', 'その他水道・光熱費', '未分類', 'その他']);
 
-/**
- * メモのある明細は、内容ではなくメモでまとめる（0.10.1。ユーザーの提案）。
- * 「セブン-イレブン 支払」のように1つの内容でいろいろな支払いをしていても、メモ（「自動車税」など）で分けられるようにするため。
- * 記号・数字だけのメモは使わない
- */
-const memoKey = (t: Transaction) => (t.memo ? recurringKey(t.memo) : '');
-
 export function groupKey(t: Transaction): string {
   if (t.large === UTILITY_LARGE && !GENERIC_MIDDLES.has(t.middle)) return `u|${t.middle}`;
-  const memo = memoKey(t);
-  return memo.length >= 2 ? memo : recurringKey(t.content);
-}
-
-/** 一覧に出す名前：メモでまとめたものはメモ、それ以外は内容 */
-function displayName(t: Transaction): string {
-  const usesMemo = !(t.large === UTILITY_LARGE && !GENERIC_MIDDLES.has(t.middle)) && memoKey(t).length >= 2;
-  return usesMemo ? t.memo : t.content;
+  return recurringKey(t.content);
 }
 
 const monthDiff = (a: string, b: string) => (Number(b.slice(0, 4)) - Number(a.slice(0, 4))) * 12 + Number(b.slice(5, 7)) - Number(a.slice(5, 7));
@@ -91,7 +78,7 @@ const monthDiff = (a: string, b: string) => (Number(b.slice(0, 4)) - Number(a.sl
 /** ym の 11〜13 か月前に出ている月（年1回の前の年） */
 const yearBefore = (ym: string, months: Map<string, number>) => [12, 11, 13].map((n) => shiftYm(ym, -n)).find((y) => months.has(y));
 
-function toItem(key: string, txs: Transaction[], latestYm: string): RecurringItem | undefined {
+function toItem(key: string, txs: Transaction[], latestYm: string, labelSuffix = ''): RecurringItem | undefined {
   const byMonth = new Map<string, number>();
   let last = txs[0];
   for (const t of txs) {
@@ -104,7 +91,7 @@ function toItem(key: string, txs: Transaction[], latestYm: string): RecurringIte
   const historyEnd = sinceLast < STOPPED_AFTER_MONTHS ? latestYm : lastYm;
   const base = {
     key,
-    label: displayName(last),
+    label: last.content + labelSuffix,
     institution: last.institution,
     large: last.large,
     lastYm,
@@ -129,6 +116,23 @@ function toItem(key: string, txs: Transaction[], latestYm: string): RecurringIte
   return { ...base, kind: 'yearly', count: years, monthlyCost: amount / 12, yearlyAmount: amount, stopped: sinceLast > 13 };
 }
 
+/**
+ * 同じ名前・まったく同じ金額の年1回の支払い（0.10.2。ユーザーと相談して決定）。
+ * 「セブン-イレブン 支払」のように1つの名前でいろいろ払っていても、毎年5月の ¥34,500（自動車税）を別の候補として見つけるため。
+ * 名前の候補がすでに年1回のときは、同じものが2つ出ないように使わない。毎月同じ金額のものは年1回にならないので出ない
+ */
+function sameAmountYearly(key: string, txs: Transaction[], latestYm: string): RecurringItem[] {
+  const byAmount = new Map<number, Transaction[]>();
+  for (const t of txs) byAmount.set(t.amount, [...(byAmount.get(t.amount) ?? []), t]);
+  const out: RecurringItem[] = [];
+  for (const [amount, list] of byAmount) {
+    if (list.length < 2) continue;
+    const item = toItem(`${key}|${-amount}`, list, latestYm, `（${formatYen(-amount)}）`);
+    if (item?.kind === 'yearly') out.push(item);
+  }
+  return out;
+}
+
 /** 固定費の候補を見つける。支出だけ（振替・計算対象外・除外した明細・食費などの大項目は使わない） */
 export function findRecurring(transactions: Iterable<Transaction>, excluded: ExclusionMap): { latestYm: string; items: RecurringItem[] } {
   const byKey = new Map<string, Transaction[]>();
@@ -147,6 +151,7 @@ export function findRecurring(transactions: Iterable<Transaction>, excluded: Exc
   for (const [key, txs] of byKey) {
     const item = toItem(key, txs, latestYm);
     if (item) items.push(item);
+    if (item?.kind !== 'yearly') items.push(...sameAmountYearly(key, txs, latestYm));
   }
   items.sort((a, b) => b.monthlyCost - a.monthlyCost || a.label.localeCompare(b.label, 'ja'));
   return { latestYm, items };

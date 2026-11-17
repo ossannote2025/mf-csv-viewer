@@ -96,7 +96,7 @@ export function RecurringView() {
   );
 }
 
-const rulesText = `同じ名前（メモのある明細はメモ）の支出が直近12か月のうち${MIN_MONTHS}か月以上あるもの、2年続けて同じ月ごろにあるもの（年1回）を候補にしています（食費・日用品・交通費・ガソリンなどは除く）。月あたりの金額は12か月の合計÷12（年1回は1回分÷12）です。`;
+const rulesText = `同じ名前の支出が直近12か月のうち${MIN_MONTHS}か月以上あるもの、2年続けて同じ月ごろにあるもの（年1回。同じ名前・同じ金額のものも）を候補にしています（食費・日用品・交通費・ガソリンなどは除く）。月あたりの金額は12か月の合計÷12（年1回は1回分÷12）です。`;
 
 function NotFixed({ items }: { items: RecurringItem[] }) {
   const [open, setOpen] = useState(false);
