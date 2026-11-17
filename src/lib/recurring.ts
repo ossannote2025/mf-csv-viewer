@@ -355,6 +355,11 @@ function asPeriodic(g: Group, occ: string[]): RecurringItem | undefined {
   };
 }
 
+const isRecurring = (g: Group, latestYm: string) => {
+  const occ = [...g.months.keys()].sort();
+  return !!(asMonthly(g, occ, latestYm) ?? asPeriodic(g, occ));
+};
+
 /** 固定費・定期支払いを見つける。支出だけ（振替・計算対象外・除外した明細・食費などの大項目は使わない） */
 export function findRecurring(transactions: Iterable<Transaction>, excluded: ExclusionMap): RecurringResult {
   const byKey = new Map<string, Transaction[]>();
@@ -370,7 +375,13 @@ export function findRecurring(transactions: Iterable<Transaction>, excluded: Exc
     else byKey.set(key, [t]);
   }
   const groups = linkRenamed(
-    [...byKey.entries()].flatMap(([key, txs]) => splitByAmount(key, txs)),
+    [...byKey.entries()].flatMap(([key, txs]) => {
+      const split = splitByAmount(key, txs);
+      if (split.length === 1 || split.some((g) => isRecurring(g, latestYm))) return split;
+      // 分けるとどれも固定費にならないが、まとめると固定費になるもの（季節講習の月だけ2件ある塾など）は、まとめたまま見る（0.9.5）
+      const whole = makeGroup(key, key, txs);
+      return isRecurring(whole, latestYm) ? [whole] : split;
+    }),
     latestYm,
   );
 

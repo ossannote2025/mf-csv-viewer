@@ -243,6 +243,21 @@ describe('findRecurring', () => {
     expect(Math.max(...r.stopped[0].ids.map((id) => -byId.get(id)!.amount))).toBeLessThan(1500);
   });
 
+  it('季節講習の月だけ2件ある、金額の毎月変わる支払い（塾など）は、分けずに1行で見る（0.9.5）', () => {
+    // 毎月5日・金額は毎月大きく変わる。12月（と直近の夏）は26日にもう1件。2026-01 で止まった
+    const juku = ymRange('2022-04', '2026-01').flatMap((ym, i) => {
+      const r = [tx(`${ym}-05`, -(36000 + ((i * 37919) % 106000)), '架空ゼミ)ジユクヒヨウ', { large: '教養・教育', middle: '塾' })];
+      if (ym.slice(5) === '12' || ym === '2025-07' || ym === '2025-08') {
+        r.push(tx(`${ym}-26`, -(80000 + ((i * 7717) % 40000)), '架空ゼミ)ジユクヒヨウ', { large: '教養・教育', middle: '塾' }));
+      }
+      return r;
+    });
+    const r = findRecurring([latest, ...juku], none);
+    expect(r.monthly).toEqual([]);
+    expect(r.stopped.map((i) => [i.label, i.intervalMonths, i.lastYm, i.variable])).toEqual([['架空ゼミ)ジユクヒヨウ', 1, '2026-01', true]]);
+    expect(r.stopped[0].ids).toHaveLength(juku.length);
+  });
+
   it('前の名前とつなぐのは、次の月から同じ日ごろ・同じくらいの金額で始まったものが1つだけのとき', () => {
     const ts = [
       latest,
