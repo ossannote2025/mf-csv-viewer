@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import Dexie from 'dexie';
 import { db, MfDatabase } from './schema';
-import { addDismissed, deleteAllData, deleteMonth, deleteTransactions, loadAll, loadRaw, resetDatabase, removeDismissed, restoreBackup, saveImportBatch, saveImported, saveRules } from './repo';
+import { addDismissed, deleteAllData, deleteMonth, deleteTransactions, loadAll, loadRaw, putRecurringChoices, removeRecurringChoices, resetDatabase, removeDismissed, restoreBackup, saveImportBatch, saveImported, saveRules } from './repo';
 import { createBackup, parseBackup } from '../lib/backup';
 import { computeExclusions } from '../lib/rules';
 import type { Transaction } from '../lib/types';
@@ -52,7 +52,7 @@ describe('repo（IndexedDB）', () => {
     expect(raw.dismissed).toHaveLength(1);
     expect(raw.meta.lastImportAt).toBe(7);
     // 書き出したバックアップは、そのまま復元できる
-    const json = JSON.stringify(createBackup(raw.transactions, raw.rules, raw.imports, raw.meta, raw.dismissed, 9));
+    const json = JSON.stringify(createBackup(raw.transactions, raw.rules, raw.imports, raw.meta, raw.dismissed, raw.recurringChoices, 9));
     expect(parseBackup(json).transactions).toHaveLength(1);
   });
 
@@ -130,6 +130,7 @@ describe('復元', () => {
     imports: [{ fileName: 'f', importedAt: 1, rowCount: 1, added: 1, updated: 0 }],
     meta: { lastImportAt: 5 },
     dismissed: [{ key: 'd|a|b', kind: 'duplicate' as const, label: '組', dismissedAt: 1 }],
+    recurringChoices: [{ key: '架空モバイル', choice: 'fixed' as const, label: '架空モバイル', decidedAt: 1 }],
   });
 
   it('置き換え：既存データは消えてバックアップの内容になる', async () => {
@@ -141,6 +142,19 @@ describe('復元', () => {
     expect(d.rules.filter((r) => r.builtin)).toHaveLength(2);
     expect(d.meta.lastBackupAt).toBe(777);
     expect(d.dismissed.map((x) => x.key)).toEqual(['d|a|b']);
+    expect(d.recurringChoices.map((x) => [x.key, x.choice])).toEqual([['架空モバイル', 'fixed']]);
+  });
+
+  it('固定費の選択：保存・取り消し・全データ削除', async () => {
+    await putRecurringChoices([
+      { key: 'a', choice: 'fixed', label: 'A', decidedAt: 1 },
+      { key: 'b', choice: 'notFixed', label: 'B', decidedAt: 1 },
+    ]);
+    await removeRecurringChoices(['a']);
+    expect((await loadAll()).recurringChoices.map((c) => c.key)).toEqual(['b']);
+    expect((await loadRaw()).recurringChoices.map((c) => c.key)).toEqual(['b']);
+    await deleteAllData();
+    expect((await loadAll()).recurringChoices).toEqual([]);
   });
 
   it('置き換え：「二重ではない」の記録もバックアップの内容になる', async () => {
@@ -229,8 +243,8 @@ describe('saveImportBatch', () => {
   });
 });
 
-describe('スキーマの更新（version 1 → 2）', () => {
-  it('version 1 のデータを残したまま、「二重ではない」の記録を保存できるようになる', async () => {
+describe('スキーマの更新（version 1 → 3）', () => {
+  it('version 1 のデータを残したまま、「二重ではない」の記録・固定費の選択を保存できるようになる', async () => {
     const name = 'mf-csv-viewer-migration-test';
     const old = new Dexie(name);
     old.version(1).stores({ transactions: 'id, ym, date', rules: 'id, order', imports: '++seq, importedAt', meta: 'key' });
@@ -239,10 +253,12 @@ describe('スキーマの更新（version 1 → 2）', () => {
 
     const next = new MfDatabase(name);
     await next.open();
-    expect(next.verno).toBe(2);
+    expect(next.verno).toBe(3);
     expect((await next.transactions.toArray()).map((t) => t.id)).toEqual(['keep']);
     await next.dismissed.put({ key: 'd|a|b', kind: 'duplicate', label: '', dismissedAt: 1 });
     expect(await next.dismissed.count()).toBe(1);
+    await next.recurringChoices.put({ key: 'a', choice: 'fixed', label: 'A', decidedAt: 1 });
+    expect(await next.recurringChoices.count()).toBe(1);
     next.close();
     await Dexie.delete(name);
   });

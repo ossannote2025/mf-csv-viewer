@@ -42,7 +42,7 @@ export function RescueScreen({ message }: { message: string }) {
     // ここまで await を挟まない（共有シートのため）
     if (!raw) return;
     const now = Date.now();
-    const json = JSON.stringify(createBackup(raw.transactions, raw.rules, raw.imports, { lastImportAt: raw.meta.lastImportAt }, raw.dismissed, now));
+    const json = JSON.stringify(createBackup(raw.transactions, raw.rules, raw.imports, { lastImportAt: raw.meta.lastImportAt }, raw.dismissed, raw.recurringChoices, now));
     const file = new File([json], backupFileName(new Date(now)), { type: 'application/json' });
     setNote(null);
     void saveFile(file).then(

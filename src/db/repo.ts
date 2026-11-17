@@ -1,4 +1,4 @@
-import type { DismissedCandidate, ExclusionRule, ImportRecord, Transaction } from '../lib/types';
+import type { DismissedCandidate, ExclusionRule, ImportRecord, RecurringChoice, Transaction } from '../lib/types';
 import { ensureBuiltinRules, repairRules } from '../lib/rules';
 import { repairTransactions, type BackupData } from '../lib/backup';
 import Dexie from 'dexie';
@@ -10,15 +10,17 @@ export interface LoadedData {
   meta: Partial<Record<MetaEntry['key'], number>>;
   imports: ImportRecord[];
   dismissed: DismissedCandidate[];
+  recurringChoices: RecurringChoice[];
 }
 
 export async function loadAll(): Promise<LoadedData> {
-  const [storedTransactions, storedRules, metaRows, imports, dismissed] = await Promise.all([
+  const [storedTransactions, storedRules, metaRows, imports, dismissed, recurringChoices] = await Promise.all([
     db.transactions.toArray(),
     db.rules.toArray(),
     db.meta.toArray(),
     db.imports.orderBy('importedAt').toArray(),
     db.dismissed.toArray(),
+    db.recurringChoices.toArray(),
   ]);
   const withBuiltin = ensureBuiltinRules(storedRules);
   if (withBuiltin.length !== storedRules.length) await db.rules.bulkPut(withBuiltin);
@@ -27,7 +29,7 @@ export async function loadAll(): Promise<LoadedData> {
   const rules = repairRules(withBuiltin);
   const meta: LoadedData['meta'] = {};
   for (const m of metaRows) meta[m.key] = m.value;
-  return { transactions, rules, meta, imports, dismissed };
+  return { transactions, rules, meta, imports, dismissed, recurringChoices };
 }
 
 export async function saveImported(transactions: Transaction[], record: ImportRecord): Promise<void> {
@@ -95,6 +97,16 @@ export async function removeDismissed(keys: string[]): Promise<void> {
   await db.dismissed.bulkDelete(keys);
 }
 
+/** 固定費の候補の選択を保存する */
+export async function putRecurringChoices(items: RecurringChoice[]): Promise<void> {
+  await db.recurringChoices.bulkPut(items);
+}
+
+/** 固定費の候補の選択を取り消す（未確認に戻す） */
+export async function removeRecurringChoices(keys: string[]): Promise<void> {
+  await db.recurringChoices.bulkDelete(keys);
+}
+
 export async function setMeta(key: MetaEntry['key'], value: number): Promise<void> {
   await db.meta.put({ key, value });
 }
@@ -105,13 +117,14 @@ export async function setMeta(key: MetaEntry['key'], value: number): Promise<voi
  * - merge: 現在のデータに追加し、同じIDの明細・ルールはバックアップの内容で上書きする
  */
 export async function restoreBackup(data: BackupData, mode: 'replace' | 'merge'): Promise<void> {
-  await db.transaction('rw', [db.transactions, db.rules, db.imports, db.meta, db.dismissed], async () => {
+  await db.transaction('rw', [db.transactions, db.rules, db.imports, db.meta, db.dismissed, db.recurringChoices], async () => {
     if (mode === 'replace') {
-      await Promise.all([db.transactions.clear(), db.rules.clear(), db.imports.clear(), db.dismissed.clear()]);
+      await Promise.all([db.transactions.clear(), db.rules.clear(), db.imports.clear(), db.dismissed.clear(), db.recurringChoices.clear()]);
     }
     await db.transactions.bulkPut(data.transactions);
     await db.rules.bulkPut(data.rules);
     if (data.dismissed.length) await db.dismissed.bulkPut(data.dismissed);
+    if (data.recurringChoices.length) await db.recurringChoices.bulkPut(data.recurringChoices);
     // 同じバックアップを何度マージしても、取り込み履歴が増えないようにする（ファイル名と日時が同じものは足さない）
     const key = (r: { fileName: string; importedAt: number }) => `${r.importedAt}|${r.fileName}`;
     const seen = new Set((await db.imports.toArray()).map(key));
@@ -122,10 +135,10 @@ export async function restoreBackup(data: BackupData, mode: 'replace' | 'merge')
   });
 }
 
-/** 全データ削除（明細・ルール・履歴・メタ情報・「二重ではない」の記録） */
+/** 全データ削除（明細・ルール・履歴・メタ情報・「二重ではない」の記録・固定費の選択） */
 export async function deleteAllData(): Promise<void> {
-  await db.transaction('rw', [db.transactions, db.rules, db.imports, db.meta, db.dismissed], async () => {
-    await Promise.all([db.transactions.clear(), db.rules.clear(), db.imports.clear(), db.meta.clear(), db.dismissed.clear()]);
+  await db.transaction('rw', [db.transactions, db.rules, db.imports, db.meta, db.dismissed, db.recurringChoices], async () => {
+    await Promise.all([db.transactions.clear(), db.rules.clear(), db.imports.clear(), db.meta.clear(), db.dismissed.clear(), db.recurringChoices.clear()]);
   });
 }
 
@@ -155,9 +168,10 @@ export async function loadRaw(): Promise<RawData> {
   const rules = repairRules(ensureBuiltinRules(await read('除外ルール', () => db.rules.toArray())));
   const imports = await read('取り込み履歴', () => db.imports.toArray());
   const dismissed = await read('「二重ではない」の記録', () => db.dismissed.toArray());
+  const recurringChoices = await read('固定費の選択', () => db.recurringChoices.toArray());
   const meta: LoadedData['meta'] = {};
   for (const m of await read('最終取り込み日など', () => db.meta.toArray())) meta[m.key] = m.value;
-  return { transactions, rules, imports, dismissed, meta, failed, dropped };
+  return { transactions, rules, imports, dismissed, recurringChoices, meta, failed, dropped };
 }
 
 /**

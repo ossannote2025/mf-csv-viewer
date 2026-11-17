@@ -3,7 +3,7 @@ import { sortByDateDesc } from '../lib/aggregate';
 import { EMPTY_FILTER, type TransactionFilter } from '../lib/filter';
 import { importCsvBytes, summarize, type FileImportResult, type ImportSummary } from '../lib/importer';
 import { computeExclusions } from '../lib/rules';
-import type { DismissedCandidate, ExclusionMap, ExclusionRule, ImportRecord, Transaction } from '../lib/types';
+import type { DismissedCandidate, ExclusionMap, ExclusionRule, ImportRecord, RecurringChoice, Transaction } from '../lib/types';
 import { candidateKeys, countNewCandidates, EMPTY_DOUBLE_COUNT, findDoubleCounts, type DoubleCountResult } from '../lib/doubleCount';
 import * as repo from '../db/repo';
 import type { RangePreset } from '../lib/series';
@@ -47,6 +47,8 @@ interface AppState {
   excluded: ExclusionMap;
   /** 「二重ではない」とした二重計上の候補 */
   dismissed: DismissedCandidate[];
+  /** 固定費の候補の選択（0.10.0） */
+  recurringChoices: RecurringChoice[];
   /** 二重計上の候補（明細・ルール・dismissed が変わるたびに計算し直す） */
   doubleCount: DoubleCountResult;
   /** 二重計上の候補の一覧を開いているか（ym を指定するとその月の候補だけ） */
@@ -105,6 +107,8 @@ interface AppState {
   dismissCandidates: (items: DismissedCandidate[]) => Promise<void>;
   /** 「二重ではない」を取り消す */
   undismissCandidates: (keys: string[]) => Promise<void>;
+  /** 固定費の候補を固定費に入れる／入れない。choice が null なら未確認に戻す */
+  setRecurringChoice: (key: string, label: string, choice: RecurringChoice['choice'] | null) => Promise<void>;
   deleteAll: () => Promise<void>;
   /** バックアップを書き出す。iPhoneでは共有シート（「ファイル」に保存）を使う */
   exportBackup: () => Promise<'shared' | 'downloaded' | 'cancelled'>;
@@ -127,6 +131,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   rules: [],
   excluded: new Map(),
   dismissed: [],
+  recurringChoices: [],
   doubleCount: EMPTY_DOUBLE_COUNT,
   doubleCountSheet: null,
   meta: {},
@@ -145,7 +150,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   init: async () => {
     try {
       const data = await repo.loadAll();
-      set({ status: 'ready', loadError: undefined, meta: data.meta, imports: data.imports, ...withExclusions(sortByDateDesc(data.transactions), data.rules, data.dismissed) });
+      set({ status: 'ready', loadError: undefined, meta: data.meta, imports: data.imports, recurringChoices: data.recurringChoices, ...withExclusions(sortByDateDesc(data.transactions), data.rules, data.dismissed) });
       if (data.transactions.length > 0) set({ tab: 'transactions' });
       repo.requestPersistence().then((persisted) => set({ persisted }));
     } catch (e) {
@@ -314,17 +319,26 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
+  setRecurringChoice: async (key, label, choice) => {
+    if (choice === null) await repo.removeRecurringChoices([key]);
+    else await repo.putRecurringChoices([{ key, label, choice, decidedAt: Date.now() }]);
+    set((s) => {
+      const rest = s.recurringChoices.filter((c) => c.key !== key);
+      return { recurringChoices: choice === null ? rest : [...rest, { key, label, choice, decidedAt: Date.now() }] };
+    });
+  },
+
   deleteAll: async () => {
     await repo.deleteAllData();
     const data = await repo.loadAll();
-    set({ meta: {}, imports: [], filter: EMPTY_FILTER, summaryYm: undefined, doubleCountSheet: null, missingReview: null, reportYm: null, ...withExclusions([], data.rules, []) });
+    set({ meta: {}, imports: [], recurringChoices: [], filter: EMPTY_FILTER, summaryYm: undefined, doubleCountSheet: null, missingReview: null, reportYm: null, ...withExclusions([], data.rules, []) });
   },
 
   exportBackup: async () => {
     // 共有シートはタップ直後に呼ぶ必要があるため、ここまで await を挟まない
-    const { transactions, rules, meta, imports, dismissed } = get();
+    const { transactions, rules, meta, imports, dismissed, recurringChoices } = get();
     const now = Date.now();
-    const json = JSON.stringify(createBackup(transactions, rules, imports, meta, dismissed, now));
+    const json = JSON.stringify(createBackup(transactions, rules, imports, meta, dismissed, recurringChoices, now));
     const name = backupFileName(new Date(now));
     const file = new File([json], name, { type: 'application/json' });
 
@@ -342,6 +356,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       meta: loaded.meta,
       imports: loaded.imports,
+      recurringChoices: loaded.recurringChoices,
       filter: EMPTY_FILTER,
       summaryYm: undefined,
       doubleCountSheet: null,

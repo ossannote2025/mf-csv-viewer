@@ -13,9 +13,11 @@ const rule: ExclusionRule = {
   createdAt: 1, updatedAt: 2,
 };
 
+const choice = { key: '架空モバイル', choice: 'fixed' as const, label: '架空モバイル', decidedAt: 2 };
+
 describe('バックアップ', () => {
   it('書き出したものをそのまま読み込める（往復）', () => {
-    const b = createBackup([tx], [...BUILTIN_RULES, rule], [{ seq: 3, fileName: 'a.csv', importedAt: 1, rowCount: 1, added: 1, updated: 0 }], { lastImportAt: 5 }, [dismissed], 99);
+    const b = createBackup([tx], [...BUILTIN_RULES, rule], [{ seq: 3, fileName: 'a.csv', importedAt: 1, rowCount: 1, added: 1, updated: 0 }], { lastImportAt: 5 }, [dismissed], [choice], 99);
     const restored = parseBackup(JSON.stringify(b));
     expect(restored.transactions).toEqual([tx]);
     expect(restored.rules.find((r) => r.id === 'r1')).toEqual(rule);
@@ -24,7 +26,15 @@ describe('バックアップ', () => {
     expect(restored.meta.lastImportAt).toBe(5);
     expect(restored.exportedAt).toBe(99);
     expect(restored.dismissed).toEqual([dismissed]);
-    expect(restored.format).toBe(2);
+    expect(restored.recurringChoices).toEqual([choice]);
+    expect(restored.format).toBe(3);
+  });
+
+  it('形式2（固定費の選択がない）のバックアップも読める。固定費の選択の壊れた項目は読み飛ばす', () => {
+    const old = { app: 'mf-csv-viewer', format: 2, exportedAt: 1, transactions: [tx], rules: [rule], imports: [], meta: {}, dismissed: [dismissed] };
+    expect(parseBackup(JSON.stringify(old)).recurringChoices).toEqual([]);
+    const b = { ...old, format: 3, recurringChoices: [{ key: '' }, 'x', { key: 'a', choice: 'maybe' }, { key: 'b', choice: 'notFixed' }] };
+    expect(parseBackup(JSON.stringify(b)).recurringChoices).toEqual([{ key: 'b', choice: 'notFixed', label: '', decidedAt: 0 }]);
   });
 
   it('形式1（「二重ではない」の記録がない）のバックアップも読める', () => {
@@ -35,7 +45,7 @@ describe('バックアップ', () => {
   });
 
   it('「二重ではない」の記録の壊れた項目は読み飛ばす', () => {
-    const b = { ...createBackup([tx], [rule], [], {}, [], 1), dismissed: [{ key: '' }, 'x', { key: 'd|a|b', kind: 'duplicate' }] };
+    const b = { ...createBackup([tx], [rule], [], {}, [], [], 1), dismissed: [{ key: '' }, 'x', { key: 'd|a|b', kind: 'duplicate' }] };
     expect(parseBackup(JSON.stringify(b)).dismissed).toEqual([{ key: 'd|a|b', kind: 'duplicate', label: '', dismissedAt: 0 }]);
   });
 
@@ -43,7 +53,7 @@ describe('バックアップ', () => {
     expect(() => parseBackup('not json')).toThrow(BackupError);
     expect(() => parseBackup('{"app":"other"}')).toThrow('このアプリのバックアップファイルではありません');
     expect(() => parseBackup(JSON.stringify({ app: 'mf-csv-viewer', format: 999, transactions: [], rules: [] }))).toThrow('新しいバージョン');
-    const broken = JSON.parse(JSON.stringify(createBackup([tx], [], [], {}, [])));
+    const broken = JSON.parse(JSON.stringify(createBackup([tx], [], [], {}, [], [])));
     broken.transactions[0].amount = 'abc';
     expect(() => parseBackup(JSON.stringify(broken))).toThrow('1件目の「金額」');
   });
@@ -118,7 +128,7 @@ describe('形の崩れた明細を整える', () => {
 
   it('整えた明細は、バックアップとして書き出して読み戻せる', () => {
     const repaired = repairTransactions([{ id: 'B1', date: '2025-08-02', amount: -500 }]).transactions;
-    const json = JSON.stringify(createBackup(repaired, [...BUILTIN_RULES], [], {}, [], 1));
+    const json = JSON.stringify(createBackup(repaired, [...BUILTIN_RULES], [], {}, [], [], 1));
     expect(parseBackup(json).transactions).toEqual(repaired);
   });
 });

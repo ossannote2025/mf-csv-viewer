@@ -71,6 +71,16 @@ export interface ImportRecord {
 export type ExclusionMap = Map<string, string[]>;
 
 /** 「二重ではない」と判断された二重計上の候補（次から候補に出さない） */
+/** 固定費の候補を、固定費に入れるか（0.10.0。DB version 3・バックアップ形式 3） */
+export interface RecurringChoice {
+  /** 候補のキー（`groupKey`：名前、光熱費は中項目） */
+  key: string;
+  choice: 'fixed' | 'notFixed';
+  /** 一覧に出なくなった候補の確認用の表示名 */
+  label: string;
+  decidedAt: number;
+}
+
 export interface DismissedCandidate {
   /** 引き落とし：'w|口座|内容'、重複購入：'d|明細ID|明細ID' */
   key: string;
