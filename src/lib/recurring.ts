@@ -18,6 +18,12 @@ const STABLE_RATIO = 0.02;
 const STOPPED_WITHIN_MONTHS = 12;
 /** 数か月ごと・毎年のものとみなす金額の揺れ（0.9.1 で ±30% → ±10%。年ごとに金額の違う買い物を拾わないため） */
 const PERIODIC_AMOUNT_RATIO = 0.1;
+/**
+ * 2〜6か月ごとのものの金額の揺れ（0.9.5 で ±30% に戻した。毎年のものは ±10% のまま）。
+ * 2か月ごとのスイミングの月謝（コースで 15,400〜18,700 円に変わる）が出なかったとのユーザーの報告で決定。
+ * 「後で元に戻すかもしれない」とのこと。戻すときは PERIODIC_AMOUNT_RATIO と同じ値にする
+ */
+const SHORT_PERIODIC_AMOUNT_RATIO = 0.3;
 /** 毎月のもの：いつもの日から何日以内なら「同じ日」とみなすか */
 const DAY_TOLERANCE = 5;
 /** 毎月のもの：いつもの日に出た月が何割以上なら固定費とみなすか */
@@ -118,6 +124,12 @@ interface Group {
   /** 月 → その月の合計・回数・日 */
   months: Map<string, { amount: number; count: number; days: number[] }>;
   last: Transaction;
+  /**
+   * 同じ名前の支払いを分けたときの、分ける前の明細のある月（0.9.5）。
+   * 分けた1本が数か月ごとに見えても、間の月に同じ名前の明細があれば数か月ごととはみなさない
+   * （毎月行く店・毎月の塾の一部が、たまたま数か月ごとに見えるのを拾わないため）
+   */
+  siblingMonths?: Set<string>;
 }
 
 /**
@@ -195,7 +207,8 @@ function splitByAmount(key: string, txs: Transaction[]): Group[] {
     }
   }
   if (tracks.length === 1) return [makeGroup(key, key, txs)];
-  return tracks.map((tr, i) => makeGroup(`${key}#${i}`, key, tr.txs));
+  const siblingMonths = new Set(byMonth.keys());
+  return tracks.map((tr, i) => ({ ...makeGroup(`${key}#${i}`, key, tr.txs), siblingMonths }));
 }
 
 interface Track {
@@ -344,11 +357,16 @@ function asPeriodic(g: Group, occ: string[]): RecurringItem | undefined {
   while (start > 0 && monthDiff(occ[start - 1], occ[start]) === interval) start--;
   const run = occ.slice(start);
   if (run.length < (interval === 12 ? 2 : 4)) return undefined;
+  if (g.siblingMonths) {
+    const inRun = new Set(run);
+    if (ymRange(run[0], run[run.length - 1]).some((ym) => !inRun.has(ym) && g.siblingMonths!.has(ym))) return undefined;
+  }
   if (run.some((ym) => g.months.get(ym)!.count > 1)) return undefined;
 
   const points = run.map((ym) => ({ ym, amount: g.months.get(ym)!.amount }));
   const mid = median(points.map((p) => p.amount));
-  if (points.some((p) => Math.abs(p.amount - mid) > mid * PERIODIC_AMOUNT_RATIO)) return undefined;
+  const ratio = interval === 12 ? PERIODIC_AMOUNT_RATIO : SHORT_PERIODIC_AMOUNT_RATIO;
+  if (points.some((p) => Math.abs(p.amount - mid) > mid * ratio)) return undefined;
   const amount = points[points.length - 1].amount;
   return {
     ...baseItem(g, interval, run),
