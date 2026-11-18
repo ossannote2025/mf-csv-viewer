@@ -163,6 +163,42 @@ describe('同じ名前・同じ金額の年1回（0.10.2）', () => {
   });
 });
 
+describe('年4回の税金（0.10.3）', () => {
+  // 6・7・9・12月の4回払い。1期目だけ金額が違う
+  const tax = (date: string, amount: number) => tx(date, -amount, '架空シ コテイシサンゼイ', { large: '税・社会保障', middle: 'その他税・社会保障', institution: '架空銀行' });
+  const years = (ys: number[]) => ys.flatMap((y) => [tax(`${y}-06-01`, 36500), tax(`${y}-07-31`, 33000), tax(`${y}-09-30`, 33000), tax(`${y}-12-25`, 33000)]);
+
+  it('いつもの最長の間隔（12月→6月の6か月）を過ぎるまでは「止まった」にしない', () => {
+    const at = (ym: string) => tx(`${ym}-02`, -100, '架空コンビニ', { large: '食費' });
+    const base = [...years([2024, 2025]), tax('2026-06-01', 36500), tax('2026-07-31', 33000)];
+    const stoppedOf = (ts: Transaction[]) => find(ts).find((i) => i.kind === 'regular')!.stopped;
+    // 7月のあと9月分がまだない11月：4か月たったが、いつもの最長（6か月）以内
+    expect(stoppedOf([at('2026-11'), ...base])).toBe(false);
+    // 2027年2月（7か月）：止まった
+    expect(stoppedOf([at('2027-02'), ...base])).toBe(true);
+    // 12月のあと6月を待つ5月：止まっていない
+    expect(stoppedOf([at('2026-05'), ...years([2024, 2025])])).toBe(false);
+  });
+
+  it('毎月のものは、今までどおり4か月で「止まった」', () => {
+    const items = find([latest, ...monthly('2025-01', '2026-07', 1, 980, '架空音楽')]);
+    expect(items.map((i) => i.stopped)).toEqual([true]);
+  });
+
+  it('名前の候補を固定費に入れたら、その名前の「（金額）」の候補は出さない。入れない・未確認なら出す', () => {
+    const items = find([latest, ...years([2024, 2025]), tax('2026-06-01', 36500), tax('2026-07-31', 33000)]);
+    expect(items.map((i) => [i.label, i.kind, i.parentKey])).toEqual([
+      ['架空シ コテイシサンゼイ', 'regular', undefined],
+      ['架空シ コテイシサンゼイ（¥36,500）', 'yearly', items[0].key],
+    ]);
+    const choice = (c: RecurringChoice['choice']): RecurringChoice[] => [{ key: items[0].key, choice: c, label: '', decidedAt: 0 }];
+    const labels = (g: ReturnType<typeof groupByChoice>) => [...g.fixed.flatMap((x) => x.items), ...g.undecided, ...g.notFixed].map((i) => i.label);
+    expect(labels(groupByChoice(items, choice('fixed')))).toEqual(['架空シ コテイシサンゼイ']);
+    expect(labels(groupByChoice(items, choice('notFixed')))).toEqual(['架空シ コテイシサンゼイ（¥36,500）', '架空シ コテイシサンゼイ']);
+    expect(labels(groupByChoice(items, []))).toHaveLength(2);
+  });
+});
+
 describe('groupByChoice', () => {
   const ts = [
     latest,
