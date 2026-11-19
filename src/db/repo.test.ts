@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import Dexie from 'dexie';
 import { db, MfDatabase } from './schema';
-import { addDismissed, deleteAllData, deleteMonth, deleteTransactions, loadAll, loadRaw, putRecurringChoices, removeRecurringChoices, resetDatabase, removeDismissed, restoreBackup, saveImportBatch, saveImported, saveRules } from './repo';
+import { addDismissed, deleteAllData, deleteMonth, deleteSampleData, deleteTransactions, loadAll, loadRaw, putRecurringChoices, removeRecurringChoices, resetDatabase, removeDismissed, restoreBackup, saveImportBatch, saveImported, saveRules } from './repo';
 import { createBackup, parseBackup } from '../lib/backup';
 import { computeExclusions } from '../lib/rules';
 import type { Transaction } from '../lib/types';
@@ -37,6 +37,15 @@ describe('repo（IndexedDB）', () => {
     await saveImported([tx('a', '2025-08-01'), tx('b', '2025-08-02'), tx('c', '2025-09-01')], { fileName: 'f', importedAt: 1, rowCount: 3, added: 3, updated: 0 });
     await deleteTransactions(['b', 'zzz']);
     expect((await loadAll()).transactions.map((t) => t.id).sort()).toEqual(['a', 'c']);
+  });
+
+  it('サンプルの明細と取り込み履歴だけを削除できる（自分の明細・履歴は残す）', async () => {
+    await saveImported([tx('SAMPLE202301001', '2023-01-05'), tx('SAMPLE202301002', '2023-01-06')], { fileName: 'mf-sample-2023.csv', importedAt: 1, rowCount: 2, added: 2, updated: 0 });
+    await saveImported([tx('abcSAMPLE1', '2023-01-07')], { fileName: '収入・支出詳細_2023-01.csv', importedAt: 2, rowCount: 1, added: 1, updated: 0 });
+    expect(await deleteSampleData()).toBe(2);
+    const d = await loadAll();
+    expect(d.transactions.map((t) => t.id)).toEqual(['abcSAMPLE1']);
+    expect(d.imports.map((r) => r.fileName)).toEqual(['収入・支出詳細_2023-01.csv']);
   });
 
   it('救済用の読み出し：集計を通さずにそのまま読み、壊れたルールは OFF にする', async () => {

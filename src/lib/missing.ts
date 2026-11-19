@@ -4,11 +4,19 @@
  * アプリは自動では消さない。候補を見せて、ユーザーが選んだものだけを削除する。
  */
 import type { Transaction } from './types';
+import { isSampleId } from './sample';
 
 /** 取り込んだ CSV が扱う期間（そのファイルのいちばん古い日付〜いちばん新しい日付。'YYYY-MM-DD'） */
 export interface DateSpan {
   from: string;
   to: string;
+  /** サンプルの CSV（0.11.0）。サンプルの CSV はサンプルの明細だけ、自分の CSV は自分の明細だけと比べる（混ざっていても誤って出さない） */
+  sample?: boolean;
+}
+
+/** その期間で「ない」かどうかを調べる明細か（日付が期間内で、サンプルかどうかが同じ） */
+function inSpan(t: Transaction, s: DateSpan): boolean {
+  return s.from <= t.date && t.date <= s.to && !!s.sample === isSampleId(t.id);
 }
 
 /** 明細の日付の範囲（明細がなければ undefined） */
@@ -20,7 +28,7 @@ export function spanOf(transactions: Transaction[]): DateSpan | undefined {
     if (t.date < from) from = t.date;
     if (t.date > to) to = t.date;
   }
-  return { from, to };
+  return transactions.every((t) => isSampleId(t.id)) ? { from, to, sample: true } : { from, to };
 }
 
 /**
@@ -33,7 +41,7 @@ export function spanOf(transactions: Transaction[]): DateSpan | undefined {
  */
 export function findMissing(stored: Transaction[], spans: DateSpan[], importedIds: ReadonlySet<string>): Transaction[] {
   if (spans.length === 0) return [];
-  return stored.filter((t) => !importedIds.has(t.id) && spans.some((s) => s.from <= t.date && t.date <= s.to));
+  return stored.filter((t) => !importedIds.has(t.id) && spans.some((s) => inSpan(t, s)));
 }
 
 /** 最初からチェックを付けておく件数の上限 */
@@ -54,6 +62,6 @@ export function looksLikeDeletedInSource(missingCount: number, storedInSpans: nu
 /** 期間内にある保存済みの明細の件数（取り込み後の件数。今回取り込んだ明細も含む） */
 export function countInSpans(stored: Transaction[], spans: DateSpan[]): number {
   let n = 0;
-  for (const t of stored) if (spans.some((s) => s.from <= t.date && t.date <= s.to)) n++;
+  for (const t of stored) if (spans.some((s) => inSpan(t, s))) n++;
   return n;
 }

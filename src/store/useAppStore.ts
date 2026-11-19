@@ -9,6 +9,7 @@ import * as repo from '../db/repo';
 import type { RangePreset } from '../lib/series';
 import { backupFileName, createBackup, parseBackup } from '../lib/backup';
 import { saveFile } from '../lib/saveFile';
+import { isSampleId, isSampleImport } from '../lib/sample';
 import { countInSpans, findMissing, looksLikeDeletedInSource, type DateSpan } from '../lib/missing';
 
 export type Tab = 'transactions' | 'charts' | 'summary' | 'settings';
@@ -110,6 +111,8 @@ interface AppState {
   /** 固定費の候補を固定費に入れる／入れない。choice が null なら未確認に戻す */
   setRecurringChoice: (key: string, label: string, choice: RecurringChoice['choice'] | null) => Promise<void>;
   deleteAll: () => Promise<void>;
+  /** サンプルの明細と、サンプルの取り込み履歴だけを削除する */
+  deleteSample: () => Promise<void>;
   /** バックアップを書き出す。iPhoneでは共有シート（「ファイル」に保存）を使う */
   exportBackup: () => Promise<'shared' | 'downloaded' | 'cancelled'>;
   /** バックアップから復元する（エラー時は BackupError などを投げる） */
@@ -332,6 +335,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     await repo.deleteAllData();
     const data = await repo.loadAll();
     set({ meta: {}, imports: [], recurringChoices: [], filter: EMPTY_FILTER, summaryYm: undefined, doubleCountSheet: null, missingReview: null, reportYm: null, ...withExclusions([], data.rules, []) });
+  },
+
+  deleteSample: async () => {
+    await repo.deleteSampleData();
+    set((s) => ({
+      imports: s.imports.filter((r) => !isSampleImport(r)),
+      // サンプルの月・明細を指したままにならないように、表示の状態を戻す
+      filter: { ...EMPTY_FILTER, showExcluded: s.filter.showExcluded },
+      summaryYm: undefined,
+      doubleCountSheet: null,
+      missingReview: null,
+      reportYm: null,
+      ...withExclusions(s.transactions.filter((t) => !isSampleId(t.id)), s.rules, s.dismissed),
+    }));
   },
 
   exportBackup: async () => {

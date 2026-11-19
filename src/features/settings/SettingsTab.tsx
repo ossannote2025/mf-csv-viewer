@@ -9,6 +9,9 @@ import { formatCount } from '../../lib/format';
 import { getStorageEstimate } from '../../db/repo';
 import { useAppStore } from '../../store/useAppStore';
 import { ImportPanel } from './ImportPanel';
+import { Sheet } from '../../components/Sheet';
+import { SamplePanel } from '../onboarding/SamplePanel';
+import { countSample } from '../../lib/sample';
 import { RuleEditor } from './RuleEditor';
 import { describeConditions, draftRule } from '../../lib/ruleText';
 import { previewRule } from '../../lib/rules';
@@ -21,6 +24,7 @@ export function SettingsTab() {
     <Page title="設定">
       <Card title="CSVの取り込み">
         <ImportPanel />
+        <SampleButton />
       </Card>
       <StorageStatus />
       <MonthList />
@@ -29,6 +33,22 @@ export function SettingsTab() {
       <DangerZone />
       <About />
     </Page>
+  );
+}
+
+/** サンプルの CSV で試す（シートを開いたときにファイルを読む） */
+function SampleButton() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className="mt-3 flex min-h-11 w-full items-center justify-between text-left text-sm">
+        <span>サンプル（架空の家計）の CSV で試す</span>
+        <ChevronRight className="size-5 shrink-0 text-muted" />
+      </button>
+      <Sheet open={open} title="サンプルで試す" onClose={() => setOpen(false)}>
+        <SamplePanel onImport={() => setOpen(false)} />
+      </Sheet>
+    </>
   );
 }
 
@@ -320,10 +340,39 @@ function BackupSection() {
 
 function DangerZone() {
   const deleteAll = useAppStore((s) => s.deleteAll);
+  const deleteSample = useAppStore((s) => s.deleteSample);
   const count = useAppStore((s) => s.transactions.length);
+  const sampleCount = useAppStore((s) => countSample(s.transactions));
   const [open, setOpen] = useState(false);
+  const [sampleOpen, setSampleOpen] = useState(false);
   return (
     <Card title="データの削除">
+      {sampleCount > 0 && (
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => setSampleOpen(true)}
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-line font-bold"
+          >
+            <TrashIcon className="size-5" />
+            サンプルの明細だけを削除
+          </button>
+          <p className="mt-2 text-xs text-muted">
+            サンプル（架空の家計）の明細 {formatCount(sampleCount)}と、その取り込み履歴を削除します。自分で取り込んだ明細と設定は残ります。
+          </p>
+          <ConfirmDialog
+            open={sampleOpen}
+            title="サンプルの明細を削除しますか？"
+            message={`サンプルの明細 ${formatCount(sampleCount)}を削除します。自分で取り込んだ明細・除外ルール・固定費の選択は残ります。`}
+            confirmLabel="削除する"
+            onCancel={() => setSampleOpen(false)}
+            onConfirm={async () => {
+              await deleteSample();
+              setSampleOpen(false);
+            }}
+          />
+        </div>
+      )}
       <button
         type="button"
         onClick={() => setOpen(true)}

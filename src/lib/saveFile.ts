@@ -4,17 +4,22 @@
  * 共有シートはタップ直後に呼ぶ必要があるため、呼び出し側はこの関数の前に await を挟まないこと。
  */
 export async function saveFile(file: File): Promise<'shared' | 'downloaded' | 'cancelled'> {
+  return saveFiles([file]);
+}
+
+/** 複数のファイルをまとめて保存する（共有シートでは1回で全部。それ以外は1つずつダウンロード） */
+export async function saveFiles(files: File[]): Promise<'shared' | 'downloaded' | 'cancelled'> {
   const touch = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
-  if (touch && navigator.canShare?.({ files: [file] })) {
+  if (touch && navigator.canShare?.({ files })) {
     try {
-      await navigator.share({ files: [file], title: file.name });
+      await navigator.share(files.length === 1 ? { files, title: files[0].name } : { files });
       return 'shared';
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') return 'cancelled';
       // 共有できない場合はダウンロードに切り替える
     }
   }
-  downloadFile(file);
+  for (const f of files) downloadFile(f);
   return 'downloaded';
 }
 

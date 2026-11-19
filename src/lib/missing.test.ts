@@ -48,6 +48,21 @@ describe('findMissing（今回の CSV にない明細）', () => {
     expect(ids(findMissing(stored, spans, new Set(['a', 'b', 'c', 'gone', 'sep'])))).toEqual(['nov']);
   });
 
+  it('サンプルの CSV はサンプルの明細だけ、自分の CSV は自分の明細だけと比べる（0.11.0）', () => {
+    const own = [tx('a', '2025-10-05'), tx('b', '2025-10-06')];
+    const sample = [tx('SAMPLE202510001', '2025-10-05'), tx('SAMPLE202510002', '2025-10-07')];
+    const stored = [...own, ...sample];
+    // サンプルを取り込んでも、自分の明細は「ない」としない
+    const sampleSpan = spanOf(sample)!;
+    expect(sampleSpan.sample).toBe(true);
+    expect(ids(findMissing(stored, [sampleSpan], new Set(['SAMPLE202510001'])))).toEqual(['SAMPLE202510002']);
+    // 自分の CSV を取り込んでも、サンプルの明細は「ない」としない
+    const ownSpan = spanOf(own)!;
+    expect(ownSpan.sample).toBeUndefined();
+    expect(ids(findMissing(stored, [ownSpan], new Set(['a'])))).toEqual(['b']);
+    expect(countInSpans(stored, [ownSpan])).toBe(2);
+  });
+
   it('期間がなければ何も返さない', () => {
     expect(findMissing(stored, [], new Set())).toEqual([]);
   });

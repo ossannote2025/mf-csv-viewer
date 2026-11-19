@@ -1,7 +1,7 @@
 {
   "name": "mf-csv-viewer",
   "private": true,
-  "version": "0.10.3",
+  "version": "0.11.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "check:data": "node scripts/check-no-private-data.mjs",
     "generate:sample": "tsx scripts/generate-sample.ts",
+    "generate:demo": "tsx scripts/generate-demo.ts",
     "check:css": "node scripts/check-css-vars.mjs",
     "screenshots": "npm run build && node scripts/screenshots.mjs"
   },
