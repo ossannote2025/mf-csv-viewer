@@ -16,7 +16,6 @@ import { useAppStore } from './store/useAppStore';
 // グラフ（Recharts）は大きいので、グラフタブを開いたときに読み込む
 const ChartsTab = lazy(() => import('./features/charts/ChartsTab'));
 
-const TITLES = { transactions: '明細', charts: 'グラフ', summary: '集計', settings: '設定' } as const;
 
 export default function App() {
   const status = useAppStore((s) => s.status);
@@ -42,7 +41,7 @@ export default function App() {
     content = <RescueScreen message={loadError ?? ''} />;
   } else if (!hasData && tab !== 'settings') {
     content = (
-      <Page title={TITLES[tab]}>
+      <Page title="CSV取り込み">
         <Onboarding />
       </Page>
     );

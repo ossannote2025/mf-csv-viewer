@@ -1,10 +1,13 @@
 import { useState, type ReactNode } from 'react';
 import { shouldShowInstallHint } from '../../lib/platform';
-import { LockIcon } from '../../components/Icons';
+import { ChevronDown, LockIcon } from '../../components/Icons';
 import { ImportPanel } from '../settings/ImportPanel';
 import { SamplePanel } from './SamplePanel';
 
-/** データ未取り込み時の案内 */
+/**
+ * データ未取り込み時の案内（0.11.2 で並べ替え）
+ * ホーム画面に追加の案内 → CSVの入手方法 → CSVファイルを選ぶ → サンプルで試す → プライバシー
+ */
 export function Onboarding() {
   const [showInstallHint] = useState(() => shouldShowInstallHint());
   return (
@@ -13,6 +16,26 @@ export function Onboarding() {
       <p className="mt-2 text-sm text-muted">マネーフォワードMEの「収入・支出詳細」CSVを読み込むと、明細の検索や集計ができます。</p>
 
       {showInstallHint && <InstallHint />}
+
+      <details open className="group mt-5 rounded-xl border border-line bg-surface px-4">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-2 font-bold [&::-webkit-details-marker]:hidden">
+          CSVの入手方法
+          <ChevronDown className="size-5 shrink-0 text-muted transition-transform group-open:rotate-180" />
+        </summary>
+        <ol className="space-y-4 pb-4 text-sm leading-relaxed">
+          <Step n={1} title="CSVをダウンロード">
+            <b className="text-ink">iPhoneアプリ</b>：「マイページ」→「入出金データをダウンロード」→ 年を選ぶ。1ファイル＝1年分です。
+            <br />
+            <b className="text-ink">PC（Web版）</b>：ログイン →「家計簿」→「収入・支出詳細」→ 月を選んで「ダウンロード」→「CSVファイル」。1ファイル＝1か月分です。
+          </Step>
+          <Step n={2} title="「ファイル」アプリに保存">
+            iPhoneアプリでは、共有シートの「"ファイル"に保存」で保存します。PCで保存したCSVは iCloud Drive などに入れると、iPhoneの「ファイル」アプリから選べます。
+          </Step>
+          <Step n={3} title="取り込む">
+            下の「CSVファイルを選ぶ」→「ファイル」アプリでCSVを選択（複数選択できます）。同じ明細を何度取り込んでも二重にはなりません。
+          </Step>
+        </ol>
+      </details>
 
       <div className="mt-5">
         <ImportPanel />
@@ -26,25 +49,9 @@ export function Onboarding() {
         </div>
       </section>
 
-      <ol className="mt-6 space-y-4 text-sm leading-relaxed">
-        <Step n={1} title="CSVをダウンロード">
-          マネーフォワードMEのWeb版にログイン →「家計簿」→「収入・支出詳細」→ 月を選んで「ダウンロード」→「CSVファイル」。
-          月ごとに1ファイルずつ保存します。
-          <br />
-          iPhoneアプリからダウンロードした年ごとのCSV（1ファイル＝1年分）も、そのまま取り込めます。
-        </Step>
-        <Step n={2} title="iPhoneに移す">PCで保存したCSVは iCloud Drive などに入れると、iPhoneの「ファイル」アプリから選べます。</Step>
-        <Step n={3} title="取り込む">
-          上の「CSVファイルを選ぶ」→「ファイル」アプリでCSVを選択（複数選択できます）。同じ明細を何度取り込んでも二重にはなりません。
-        </Step>
-      </ol>
-
       <div className="mt-6 flex gap-3 rounded-xl bg-accent-soft p-4 text-sm leading-relaxed">
         <LockIcon className="size-6 shrink-0 text-accent" />
-        <p>
-          データはこの端末のブラウザ内だけに保存され、外部のサーバーには一切送信されません。
-          <b>ホーム画面に追加したアプリと Safari では保存場所が別</b>なので、普段使う方から取り込んでください。
-        </p>
+        <p>データはこの端末のブラウザ内だけに保存され、外部のサーバーには一切送信されません。</p>
       </div>
     </div>
   );
@@ -57,6 +64,7 @@ function InstallHint() {
       <h3 className="font-bold">ホーム画面に追加してから使うのがおすすめ</h3>
       <p className="mt-1">
         ホーム画面に追加したアプリと Safari では、<b>データの保存場所が別</b>です。先に追加して、ホーム画面のアイコンから開いてから取り込んでください。
+        Safariのままだと、しばらく使わないとデータが消えることがあります。
       </p>
       <ol className="mt-3 space-y-2">
         <HintStep n={1}>
@@ -71,10 +79,11 @@ function InstallHint() {
   );
 }
 
+/** 案内の番号は、CSVの入手手順（塗りつぶしの丸）と見分けられるよう、小さめの白抜きにする（0.11.2） */
 function HintStep({ n, children }: { n: number; children: ReactNode }) {
   return (
     <li className="flex gap-2">
-      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold text-on-accent">{n}</span>
+      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-accent bg-surface text-[11px] font-bold text-accent">{n}</span>
       <span>{children}</span>
     </li>
   );
