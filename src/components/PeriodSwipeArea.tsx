@@ -1,10 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { detectSwipe, periodAfterSwipe, SWIPE_EDGE } from '../lib/swipe';
-
-/** ホーム画面から開いた PWA か（PWA には画面端の「戻る」ジェスチャーがない） */
-function isStandalone() {
-  return window.matchMedia?.('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true;
-}
+// ホーム画面から開いた PWA か（PWA には画面端の「戻る」ジェスチャーがない）
+import { isStandalone } from '../lib/platform';
 
 /** タッチの開始位置が横スクロールできる要素の中か（その中の横スワイプはスクロールに使う） */
 function inHorizontalScroller(target: EventTarget | null, root: HTMLElement) {
