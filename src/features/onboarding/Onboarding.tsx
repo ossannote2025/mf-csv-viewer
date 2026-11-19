@@ -1,14 +1,18 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import { shouldShowInstallHint } from '../../lib/platform';
 import { LockIcon } from '../../components/Icons';
 import { ImportPanel } from '../settings/ImportPanel';
 import { SamplePanel } from './SamplePanel';
 
 /** データ未取り込み時の案内 */
 export function Onboarding() {
+  const [showInstallHint] = useState(() => shouldShowInstallHint());
   return (
     <div className="px-4 py-6">
       <h2 className="text-xl font-bold">はじめに CSV を取り込みましょう</h2>
       <p className="mt-2 text-sm text-muted">マネーフォワードMEの「収入・支出詳細」CSVを読み込むと、明細の検索や集計ができます。</p>
+
+      {showInstallHint && <InstallHint />}
 
       <div className="mt-5">
         <ImportPanel />
@@ -43,6 +47,36 @@ export function Onboarding() {
         </p>
       </div>
     </div>
+  );
+}
+
+/** iPhone・iPad のブラウザで開いているときの「ホーム画面に追加」の案内（0.11.1） */
+function InstallHint() {
+  return (
+    <section className="mt-5 rounded-xl bg-accent-soft p-4 text-sm leading-relaxed" aria-label="ホーム画面に追加">
+      <h3 className="font-bold">ホーム画面に追加してから使うのがおすすめ</h3>
+      <p className="mt-1">
+        ホーム画面に追加したアプリと Safari では、<b>データの保存場所が別</b>です。先に追加して、ホーム画面のアイコンから開いてから取り込んでください。
+      </p>
+      <ol className="mt-3 space-y-2">
+        <HintStep n={1}>
+          画面下の「<b>…</b>」→「<b>共有</b>」をタップ（共有ボタン（□に↑）が見えていれば、それをタップ）
+        </HintStep>
+        <HintStep n={2}>
+          「<b>ホーム画面に追加</b>」→「<b>追加</b>」（「Webアプリとして開く」が出たら、オンのまま）
+        </HintStep>
+        <HintStep n={3}>ホーム画面のアイコンから開いて、CSVを取り込む</HintStep>
+      </ol>
+    </section>
+  );
+}
+
+function HintStep({ n, children }: { n: number; children: ReactNode }) {
+  return (
+    <li className="flex gap-2">
+      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold text-on-accent">{n}</span>
+      <span>{children}</span>
+    </li>
   );
 }
 
