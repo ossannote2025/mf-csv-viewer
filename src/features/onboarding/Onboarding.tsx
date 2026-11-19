@@ -24,11 +24,13 @@ export function Onboarding() {
         </summary>
         <ol className="space-y-4 pb-4 text-sm leading-relaxed">
           <Step n={1} title="CSVをダウンロード">
-            マネーフォワードMEのWeb版にログイン →「家計簿」→「収入・支出詳細」→ 月を選んで「ダウンロード」→「CSVファイル」。月ごとに1ファイルずつ保存します。
+            <b className="text-ink">iPhoneアプリ</b>：「マイページ」→「入出金データをダウンロード」→ 年を選ぶ。1ファイル＝1年分です。
             <br />
-            iPhoneアプリからダウンロードした年ごとのCSV（1ファイル＝1年分）も、そのまま取り込めます。
+            <b className="text-ink">PC（Web版）</b>：ログイン →「家計簿」→「収入・支出詳細」→ 月を選んで「ダウンロード」→「CSVファイル」。1ファイル＝1か月分です。
           </Step>
-          <Step n={2} title="iPhoneに移す">PCで保存したCSVは iCloud Drive などに入れると、iPhoneの「ファイル」アプリから選べます。</Step>
+          <Step n={2} title="「ファイル」アプリに保存">
+            iPhoneアプリでは、共有シートの「"ファイル"に保存」で保存します。PCで保存したCSVは iCloud Drive などに入れると、iPhoneの「ファイル」アプリから選べます。
+          </Step>
           <Step n={3} title="取り込む">
             下の「CSVファイルを選ぶ」→「ファイル」アプリでCSVを選択（複数選択できます）。同じ明細を何度取り込んでも二重にはなりません。
           </Step>
