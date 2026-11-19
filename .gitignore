@@ -9,10 +9,11 @@ coverage/
 *.tsbuildinfo
 
 # ===== 家計データの誤コミット防止 =====
-# CSVはすべて除外し、架空データ（sample/）だけを例外にする
+# CSVはすべて除外し、架空データ（sample/ と、アプリで配るサンプルの public/sample/）だけを例外にする
 *.csv
 *.CSV
 !sample/**/*.csv
+!public/sample/mf-sample-*.csv
 
 # JSON（バックアップ）もすべて除外し、設定ファイルと sample/ だけを例外にする
 *.json

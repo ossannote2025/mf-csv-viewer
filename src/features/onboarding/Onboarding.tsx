@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { LockIcon } from '../../components/Icons';
 import { ImportPanel } from '../settings/ImportPanel';
+import { SamplePanel } from './SamplePanel';
 
 /** データ未取り込み時の案内 */
 export function Onboarding() {
@@ -12,6 +13,14 @@ export function Onboarding() {
       <div className="mt-5">
         <ImportPanel />
       </div>
+
+      <section className="mt-5 rounded-xl border border-line bg-surface p-4">
+        <h3 className="font-bold">まずはサンプルで試す</h3>
+        <p className="mt-1 text-sm text-muted">自分のデータを入れる前に、架空のデータでどんなことができるかを確かめられます。</p>
+        <div className="mt-3">
+          <SamplePanel />
+        </div>
+      </section>
 
       <ol className="mt-6 space-y-4 text-sm leading-relaxed">
         <Step n={1} title="CSVをダウンロード">

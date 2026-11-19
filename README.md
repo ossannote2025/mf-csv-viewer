@@ -102,6 +102,16 @@ iPhone の Safari（ホーム画面に追加）での利用を想定していま
 - オフラインでも動作（PWA）。新しいバージョンが出ると画面下に「更新」ボタンが表示されます
 
 
+## まずはサンプルで試す
+
+自分の家計データを入れる前に、架空の家計（2023年1月〜2026年10月・約3,000件）で、どんなことができるかを試せます。店名・金融機関名はすべて架空です。
+
+- 最初の画面（または設定タブの「サンプル（架空の家計）の CSV で試す」）で選びます
+  - **サンプルをそのまま取り込む**：ボタン1つで取り込みます
+  - **CSVを保存（4ファイル）**：1年分ずつの CSV を保存します（iPhone では共有シートの「"ファイル"に保存」）。保存したファイルを「CSVファイルを選ぶ」から取り込むと、実際の使い方と同じ手順を試せます
+- 固定費の候補（2か月ごとの水道・金額が月ごとに違う塾・年1回の自動車税・4回払いの固定資産税・途中でやめたサブスクなど）や、二重計上の候補（振替になっていないカードの引き落とし・通販とカードの組）も入っています
+- 試したあとは、設定タブの「データの削除」→「**サンプルの明細だけを削除**」で消せます。あとから自分のデータを取り込んでいても、サンプルの明細だけが消えます
+
 ## マネーフォワードME から CSV をダウンロードする
 
 CSV は Web 版（PCのブラウザ）と iPhone アプリのどちらからダウンロードしたものでも取り込めます。
@@ -197,10 +207,12 @@ npm run lint             # ESLint
 npm run build            # 本番ビルド（dist/）
 npm run check:data       # 実データの誤コミットチェック
 npm run generate:sample  # 架空のサンプルCSVを sample/ に再生成
+npm run generate:demo    # アプリで配るサンプル（public/sample/ と src/lib/sampleFiles.ts）を再生成
 npm run screenshots      # README の画面イメージ（docs/screenshots/）を架空データで撮り直す（要 Playwright・日本語フォント）
 ```
 
 - 技術: Vite + React + TypeScript / Tailwind CSS / Dexie.js（IndexedDB）/ PapaParse / TanStack Virtual / Zustand / Recharts / vite-plugin-pwa
 - `sample/` には架空の店名・金融機関名で作ったテスト用CSVだけを置いています（Shift_JIS・UTF-8 BOMあり・UTF-8 BOMなし。`*-doublecount-*.csv` は二重計上の候補の確認用）
+- `public/sample/` は、アプリから取り込み・保存できる架空の家計（1年1ファイル）です。明細の ID はすべて `SAMPLE＋数字` で、`npm run check:data` で確かめています
 - `main` ブランチに push すると GitHub Actions で GitHub Pages にデプロイされます
 - IndexedDB のスキーマを変更するときは `src/db/schema.ts` に新しい `version()` を追加し、既存データのマイグレーションを書くこと

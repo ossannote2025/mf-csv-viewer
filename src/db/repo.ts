@@ -3,6 +3,7 @@ import { ensureBuiltinRules, repairRules } from '../lib/rules';
 import { repairTransactions, type BackupData } from '../lib/backup';
 import Dexie from 'dexie';
 import { db, type MetaEntry } from './schema';
+import { isSampleId, isSampleImport } from '../lib/sample';
 
 export interface LoadedData {
   transactions: Transaction[];
@@ -72,6 +73,15 @@ export async function deleteMonth(ym: string): Promise<number> {
 /** ID を指定して明細を削除する（「CSV にない明細」の整理） */
 export async function deleteTransactions(ids: string[]): Promise<void> {
   await db.transactions.bulkDelete(ids);
+}
+
+/** サンプルの明細と、サンプルの CSV の取り込み履歴を削除する。消した明細の件数を返す */
+export async function deleteSampleData(): Promise<number> {
+  return db.transaction('rw', db.transactions, db.imports, async () => {
+    const n = await db.transactions.filter((t) => isSampleId(t.id)).delete();
+    await db.imports.filter((r) => isSampleImport(r)).delete();
+    return n;
+  });
 }
 
 export async function saveRule(rule: ExclusionRule): Promise<void> {
