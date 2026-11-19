@@ -26,3 +26,6 @@ export const EyeIcon = svg('M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 
 export const EyeOffIcon = svg('M3 3l18 18M10.6 10.6a3 3 0 0 0 4.2 4.2M9.9 5.2A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6C3.9 8.4 2 12 2 12s3.5 7 10 7a9.6 9.6 0 0 0 5.4-1.6');
 export const LockIcon = svg('M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4');
 export const DownloadIcon = svg('M12 4v12M7 11l5 5 5-5M4 20h16');
+/** 試験管（フラスコ）：「サンプルで試す」 */
+export const FlaskIcon = svg('M9 3h6M10 3v6l-5.6 9.4A1.7 1.7 0 0 0 5.9 21h12.2a1.7 1.7 0 0 0 1.5-2.6L14 9V3M7 15h10');
+export const ChevronDown = svg('M6 9l6 6 6-6');

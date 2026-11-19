@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isIosDevice, isStandalone, shouldShowInstallHint } from './platform';
+import { hasFinePointer, isIosDevice, isStandalone, shouldShowInstallHint } from './platform';
 
 const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1';
 const MAC = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15';
@@ -35,5 +35,14 @@ describe('shouldShowInstallHint（ホーム画面に追加の案内）', () => {
     expect(shouldShowInstallHint(media(false), { userAgent: IPHONE, standalone: true })).toBe(false);
     expect(shouldShowInstallHint(media(false), { userAgent: MAC, maxTouchPoints: 0 })).toBe(false);
     expect(shouldShowInstallHint(media(false), { userAgent: ANDROID, maxTouchPoints: 5 })).toBe(false);
+  });
+});
+
+describe('hasFinePointer（ドラッグ&ドロップの案内）', () => {
+  const pointer = (fine: boolean) => ({ matchMedia: ((q: string) => ({ matches: fine && q === '(pointer: fine)' })) as unknown as Window['matchMedia'] });
+  it('マウスのある端末だけ true、タッチ端末・matchMedia がない環境では false', () => {
+    expect(hasFinePointer(pointer(true))).toBe(true);
+    expect(hasFinePointer(pointer(false))).toBe(false);
+    expect(hasFinePointer({} as Pick<Window, 'matchMedia'>)).toBe(false);
   });
 });

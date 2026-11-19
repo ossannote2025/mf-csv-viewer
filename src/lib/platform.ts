@@ -21,3 +21,8 @@ export function isStandalone(win: Pick<Window, 'matchMedia'> | undefined = typeo
 export function shouldShowInstallHint(win?: Pick<Window, 'matchMedia'>, nav: NavigatorLike = navigator): boolean {
   return isIosDevice(nav) && !isStandalone(win ?? (typeof window === 'undefined' ? undefined : window), nav);
 }
+
+/** マウスなど細かく指せるポインターがあるか（ドラッグ&ドロップの案内を出すかの判定。タッチ端末では false。0.11.2） */
+export function hasFinePointer(win: Pick<Window, 'matchMedia'> | undefined = typeof window === 'undefined' ? undefined : window): boolean {
+  return win?.matchMedia?.('(pointer: fine)').matches === true;
+}

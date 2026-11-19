@@ -1,5 +1,6 @@
 import { useRef, useState, type DragEvent } from 'react';
 import { UploadIcon } from '../../components/Icons';
+import { hasFinePointer } from '../../lib/platform';
 import { useAppStore } from '../../store/useAppStore';
 
 /** CSVの取り込み（ファイル選択＋ドラッグ&ドロップ） */
@@ -8,6 +9,8 @@ export function ImportPanel({ compact }: { compact?: boolean }) {
   const progress = useAppStore((s) => s.importProgress);
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  // ドラッグ&ドロップの案内はマウスのある端末だけ（タッチ端末ではできないため）
+  const [finePointer] = useState(() => hasFinePointer());
 
   const handleFiles = (list: FileList | null) => {
     if (!list || list.length === 0) return;
@@ -54,8 +57,12 @@ export function ImportPanel({ compact }: { compact?: boolean }) {
       {!compact && (
         <p className="mt-3 text-xs leading-relaxed text-muted">
           複数ファイルをまとめて選べます（10年分・120ファイルでもOK）。
-          <br className="hidden sm:inline" />
-          PCではここにファイルをドラッグ&ドロップできます。
+          {finePointer && (
+            <>
+              <br className="hidden sm:inline" />
+              PCではここにファイルをドラッグ&ドロップできます。
+            </>
+          )}
         </p>
       )}
     </div>
