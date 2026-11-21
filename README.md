@@ -3,6 +3,8 @@
 マネーフォワードME からダウンロードした「収入・支出詳細」CSV を読み込み、明細の検索・集計ができる Web アプリです。
 iPhone の Safari（ホーム画面に追加）での利用を想定しています。
 
+> マネーフォワード株式会社とは関係のない、**非公式**の個人用アプリです。
+
 公開URL: https://ossannote2025.github.io/mf-csv-viewer/
 
 ## できること
@@ -46,6 +48,16 @@ iPhone の Safari（ホーム画面に追加）での利用を想定していま
     <td align="center" width="50%">
       <img src="docs/screenshots/year-report.png" alt="集計タブの年間レポート：年の収入・支出・収支の合計と月平均、前年比、支出カテゴリのランキング" width="260"><br>
       <b>集計：年間レポート</b><br>年の合計・月平均・前年比と、支出カテゴリのランキング
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/monthly.png" alt="集計タブの月次：月の収入・支出・収支と、前月・前年同月との比較" width="260"><br>
+      <b>集計：月次</b><br>月の収入・支出・収支と、前月・前年同月との比較
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/recurring.png" alt="集計タブの固定費：固定費に入れた支払いの月あたりの合計と、大項目ごとの一覧" width="260"><br>
+      <b>集計：固定費</b><br>選んだ固定費の月あたりの合計と、12か月の支払いの様子
     </td>
   </tr>
 </table>
@@ -168,7 +180,7 @@ npm run build            # 本番ビルド（dist/）
 npm run check:data       # 実データの誤コミットチェック
 npm run generate:sample  # 架空のサンプルCSVを sample/ に再生成
 npm run generate:demo    # アプリで配るサンプル（public/sample/ と src/lib/sampleFiles.ts）を再生成
-npm run screenshots      # README の画面イメージ（docs/screenshots/）を架空データで撮り直す（要 Playwright・日本語フォント）
+npm run screenshots      # README の画面イメージ（docs/screenshots/ の6枚）を架空データで撮り直す（要 Playwright・日本語フォント）
 ```
 
 - 技術: Vite + React + TypeScript / Tailwind CSS / Dexie.js（IndexedDB）/ PapaParse / TanStack Virtual / Zustand / Recharts / vite-plugin-pwa

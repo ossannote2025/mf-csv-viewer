@@ -121,8 +121,25 @@ try {
   await shot('trend');
 
   await tab('集計');
+  await tab('月次');
+  await shot('monthly');
+
   await tab('年間レポート');
   await shot('year-report');
+
+  // 固定費：家賃・光熱費・携帯などは「入れる」、それ以外の候補は「入れない」にしてから撮る
+  await tab('固定費');
+  const FIXED = /家賃|電力|ガス|水道|モバイル/;
+  for (;;) {
+    const btn = page.getByRole('button', { name: /を固定費に入れる$/ }).first();
+    if ((await btn.count()) === 0) break;
+    const label = (await btn.getAttribute('aria-label')) ?? '';
+    if (FIXED.test(label)) await btn.click();
+    else await page.getByRole('button', { name: label.replace(/入れる$/, '入れない') }).click();
+    await page.waitForTimeout(100);
+  }
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await shot('recurring');
 } finally {
   await browser.close();
   await new Promise((r) => server.httpServer.close(r));
