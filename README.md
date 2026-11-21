@@ -189,3 +189,7 @@ npm run screenshots      # README の画面イメージ（docs/screenshots/ の6
 - このリポジトリで公開しているのはプログラムだけです。実データはコミットしないでください（`.gitignore` と CI（`npm run check:data`）で防いでいます）
 - `main` ブランチに push すると GitHub Actions で GitHub Pages にデプロイされます
 - IndexedDB のスキーマを変更するときは `src/db/schema.ts` に新しい `version()` を追加し、既存データのマイグレーションを書くこと
+
+## ライセンス
+
+[MIT ライセンス](LICENSE)です。アプリに含まれているライブラリのライセンスは、アプリの設定タブ →「ライセンス」で見られます（公開版の `THIRD_PARTY_LICENSES.txt` にも同じものを置いています）。

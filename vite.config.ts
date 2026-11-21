@@ -4,6 +4,10 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import type { Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { collectThirdPartyLicenses, formatLicensesText, packageNameFromPath } from './scripts/thirdPartyLicenses.ts';
 
 /**
  * 本番ビルドにだけ CSP（Content-Security-Policy）を埋め込む。
@@ -34,6 +38,43 @@ function cspPlugin(): Plugin {
   };
 }
 
+/**
+ * ライセンスの表示（設定タブ →「ライセンス」）。
+ * - virtual:third-party-licenses … このアプリの LICENSE と、同梱ライブラリのライセンス文（画面から遅延読み込み）
+ * - ビルド結果に THIRD_PARTY_LICENSES.txt も置く
+ * - ビルドに入ったライブラリが一覧から漏れていたら、ビルドを失敗させる
+ */
+const LICENSES_ID = 'virtual:third-party-licenses';
+function licensesPlugin(): Plugin {
+  const root = path.dirname(fileURLToPath(import.meta.url));
+  const load = () => ({
+    app: fs.readFileSync(path.join(root, 'LICENSE'), 'utf8'),
+    libs: collectThirdPartyLicenses(root),
+  });
+  return {
+    name: 'third-party-licenses',
+    resolveId(id) {
+      return id === LICENSES_ID ? '\0' + LICENSES_ID : undefined;
+    },
+    load(id) {
+      if (id !== '\0' + LICENSES_ID) return undefined;
+      const { app, libs } = load();
+      return `export const appLicense = ${JSON.stringify(app)};\nexport const libraries = ${JSON.stringify(libs)};\n`;
+    },
+    generateBundle() {
+      const { app, libs } = load();
+      const listed = new Set(libs.map((l) => l.name));
+      const missing = new Set<string>();
+      for (const id of this.getModuleIds()) {
+        const name = packageNameFromPath(id);
+        if (name && !listed.has(name)) missing.add(name);
+      }
+      if (missing.size) this.error(`ライセンスの一覧にないライブラリがビルドに入っています: ${[...missing].join(', ')}`);
+      this.emitFile({ type: 'asset', fileName: 'THIRD_PARTY_LICENSES.txt', source: formatLicensesText(app, libs) });
+    },
+  };
+}
+
 export default defineConfig({
   base: '/mf-csv-viewer/',
   define: {
@@ -43,6 +84,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     cspPlugin(),
+    licensesPlugin(),
     VitePWA({
       // 新しいバージョンがあるときは画面に案内を出し、ユーザーが更新する（取り込み中の自動リロードを避ける）
       registerType: 'prompt',
@@ -71,6 +113,6 @@ export default defineConfig({
   ],
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
   },
 });

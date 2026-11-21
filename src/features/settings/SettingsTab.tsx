@@ -13,6 +13,7 @@ import { Sheet } from '../../components/Sheet';
 import { SamplePanel } from '../onboarding/SamplePanel';
 import { countSample } from '../../lib/sample';
 import { RuleEditor } from './RuleEditor';
+import { LicenseSheet } from './LicenseSheet';
 import { describeConditions, draftRule } from '../../lib/ruleText';
 import { previewRule } from '../../lib/rules';
 import { backupIsStale, BackupError } from '../../lib/backup';
@@ -400,6 +401,7 @@ function DangerZone() {
 }
 
 function About() {
+  const [licenseOpen, setLicenseOpen] = useState(false);
   return (
     <Card title="このアプリについて">
       <div className="flex gap-3 text-sm leading-relaxed">
@@ -409,7 +411,12 @@ function About() {
           アクセス解析や外部サービスの読み込みもしていません。
         </p>
       </div>
-      <p className="mt-3 text-xs text-muted">バージョン {__APP_VERSION__}</p>
+      <button type="button" onClick={() => setLicenseOpen(true)} className="mt-3 flex min-h-11 w-full items-center justify-between border-t border-line text-left text-sm">
+        <span>ライセンス</span>
+        <ChevronRight className="size-5 shrink-0 text-muted" />
+      </button>
+      <LicenseSheet open={licenseOpen} onClose={() => setLicenseOpen(false)} />
+      <p className="mt-1 text-xs text-muted">バージョン {__APP_VERSION__}</p>
     </Card>
   );
 }
